@@ -75,9 +75,9 @@ const VoiceAssistant: React.FC = () => {
                 const response = await fetch('http://192.168.2.68:8000/api/chat/', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': 'application/json'
+                        'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({ message: input })
+                    body: JSON.stringify({ message: input})
                 });
 
                 const data = await response.json();
