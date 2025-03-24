@@ -18,7 +18,8 @@ import { Audio } from 'expo-av';
 import { MaterialIcons } from '@expo/vector-icons';
 import { recordSpeech } from "@/functions/recordSpeech";
 import * as FileSystem from 'expo-file-system';
-
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import  setModalVisible  from './index';
 interface Message {
     text: string;
     sender: 'user' | 'bot';
@@ -65,37 +66,77 @@ const VoiceAssistant: React.FC = () => {
         };
     }, []);
 
+    //THIS
+    const refreshAccessToken = async () => {
+        const refreshToken = await AsyncStorage.getItem("refreshToken");
+    
+        if (!refreshToken) {
+            setModalVisible(true); // Force re-login if refresh token is missing
+            return;
+        }
+    
+        try {
+            const response = await fetch("http://192.168.2.68:8000/api/token/refresh/", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ refresh: refreshToken }),
+            });
+    
+            const data = await response.json();
+    
+            if (response.status === 200) {
+                await AsyncStorage.setItem("accessToken", data.access); // Update access token
+            } else {
+                await AsyncStorage.removeItem("refreshToken");
+                setModalVisible(true); // Force re-login
+            }
+        } catch (error) {
+            console.error("Error refreshing token:", error);
+            await AsyncStorage.removeItem("refreshToken");
+            setModalVisible(true); // Force re-login
+        }
+    };
+
+
     const handleSend = async () => {
         if (input.trim()) {
-            const newMessage = { text: input, sender: 'user' as const };
+            const newMessage = { text: input, sender: "user" as const };
             setMessages((prevMessages) => [...prevMessages, newMessage]);
             setInput('');
-
+    
             try {
-                const response = await fetch('http://192.168.2.68:8000/api/chat/', {
-                    method: 'POST',
+                const accessToken = await AsyncStorage.getItem("accessToken");   
+                const response = await fetch("http://192.168.2.68:8000/api/chat/", {
+                    method: "POST",
                     headers: {
-                        'Content-Type': 'application/json',
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${accessToken}` // Attach JWT
                     },
-                    body: JSON.stringify({ message: input})
+                    body: JSON.stringify({ message: input }),
                 });
-
+    
+               if (response.status === 401) {
+                    // If unauthorized, try refreshing token
+                    await refreshAccessToken();
+                    return handleSend(); // Retry request
+                }
                 const data = await response.json();
-                const botMessage = data.answer || 'Sorry, I did not understand that.';
-
+                const botMessage = data.answer || "Sorry, I did not understand that.";
+    
                 setMessages((prevMessages) => [
-                    ...prevMessages, 
-                    { text: botMessage, sender: 'bot' as const } 
+                    ...prevMessages,
+                    { text: botMessage, sender: "bot" as const },
                 ]);
             } catch (error) {
-                console.error('Error communicating with backend API:', error);
+                console.error("Error communicating with backend API:", error);
                 setMessages((prevMessages) => [
-                    ...prevMessages, 
-                    { text: 'Sorry, something went wrong.', sender: 'bot' as const }
+                    ...prevMessages,
+                    { text: "Sorry, something went wrong.", sender: "bot" as const },
                 ]);
             }
         }
     };
+    
 
     const currentSoundRef = useRef<Audio.Sound | null>(null);
 const currentlyPlayingUriRef = useRef<string | null>(null);
@@ -188,32 +229,37 @@ const playAudio = async (audioUri: string) => {
     
     const stopRecording = async () => {
         setIsRecording(false);
-
         if (intervalRef.current) {
             clearInterval(intervalRef.current);
             intervalRef.current = null;
         }
-    
         if (!audioRecordingRef.current) return;
-    
         try {
             await audioRecordingRef.current.stopAndUnloadAsync();
             const uri = audioRecordingRef.current.getURI();
-    
             if (!uri) {
                 console.error("No recording URI found.");
                 return;
             }
-            const newMessage = { text: "Voice message", sender: 'user' as const, audioUri: uri , duration: durationRef.current};
+            const newMessage = { text: "Voice message", sender: "user" as const, audioUri: uri, duration: durationRef.current };
             setMessages((prevMessages) => [...prevMessages, newMessage]);
-    
+            const accessToken = await AsyncStorage.getItem("accessToken");
             const uploadUrl = "http://192.168.2.68:8000/api/chat/";
     
             const response = await FileSystem.uploadAsync(uploadUrl, uri, {
                 fieldName: "audio",
                 httpMethod: "POST",
                 uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+                headers: {
+                    "Authorization": `Bearer ${accessToken}`, // Attach JWT
+                },
             });
+    
+            if (response.status === 401) {
+                // If unauthorized, refresh token and retry
+                await refreshAccessToken();
+                return stopRecording();
+            }
     
             const data = JSON.parse(response.body);
             const botMessage = data.answer || "Sorry, I did not understand that.";
@@ -230,7 +276,6 @@ const playAudio = async (audioUri: string) => {
             ]);
         }
     };
-    
 
     return (
         <SafeAreaView style={styles.container}>

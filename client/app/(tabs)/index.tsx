@@ -9,12 +9,12 @@ const HomePage: React.FC = () => {
     const router = useRouter();
     const [isModalVisible, setModalVisible] = useState(false);
     const [isRegistering, setIsRegistering] = useState(false);
-    const [email, setEmail] = useState("");
+    const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [name, setName] = useState(""); // Only for registration
     const [age, setAge] = useState("");   // Only for registration
     const [loading, setLoading] = useState(false);
-    const [userEmail, setUserEmail] = useState<string | null>(null);
+    const [userName, setUserName] = useState<string | null>(null);
     const [threads, setThreads] = useState<any[]>([]);
 
     useEffect(() => {
@@ -30,8 +30,9 @@ const HomePage: React.FC = () => {
                 { 
                     text: "Yes", 
                     onPress: async () => {
-                        await AsyncStorage.removeItem('userEmail'); // Clear login data
-                        setUserEmail(null);
+                        await AsyncStorage.removeItem("accessToken");
+                        await AsyncStorage.removeItem("refreshToken");                        
+                        setUserName(null);
                         setModalVisible(true);
                     } 
                 }
@@ -40,17 +41,18 @@ const HomePage: React.FC = () => {
     };
 
     const checkIfLoggedIn = async () => {
-        const storedEmail = await AsyncStorage.getItem('userEmail');
-        if (storedEmail) {
-            setUserEmail(storedEmail); // User is logged in
+        const accessToken = await AsyncStorage.getItem("accessToken");
+    
+        if (accessToken) {
+            setUserName("authenticated"); // Just a placeholder value to indicate login
         } else {
-            setModalVisible(true); // Show login modal
+            setModalVisible(true); // Show login modal if token is missing
         }
     };
 
 
     const handleLogin = async () => {
-        if (!email || !password) {
+        if (!username || !password) {
             Alert.alert("Error", "Please fill in all fields.");
             return;
         }
@@ -60,7 +62,7 @@ const HomePage: React.FC = () => {
             const response = await fetch('http://192.168.2.68:8000/api/login/', {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, password }),
+                body: JSON.stringify({ username, password }),
             });
 
             const data = await response.json();
@@ -68,8 +70,9 @@ const HomePage: React.FC = () => {
 
             if (response.status === 200) {
                
-                    await AsyncStorage.setItem("userEmail", email); // Store auth token
-                    setUserEmail(email); // Store the email as well (optional)
+                    await AsyncStorage.setItem("accessToken", data.tokens.access); // Store access token
+                    await AsyncStorage.setItem("refreshToken", data.tokens.refresh); // Store auth token
+                    setUserName(username); // Store the email as well (optional)
                     setModalVisible(false); // Close the login modal after success
             }else {
                 Alert.alert("Error", data.message);
@@ -79,10 +82,11 @@ const HomePage: React.FC = () => {
             Alert.alert("Error", "Something went wrong. Please try again.");
         }
     };
+    
 
 
     const handleRegister = async () => {
-        if (!email || !password || !name ) {
+        if (!username || !password || !name || !age) {
             Alert.alert("Error", "Please fill in all fields.");
             return;
         }
@@ -92,15 +96,18 @@ const HomePage: React.FC = () => {
             const response = await fetch('http://192.168.2.68:8000/api/register/', {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, password, name, age }),
+                body: JSON.stringify({ username, password, name, age }),
             });
 
             const data = await response.json();
             setLoading(false);
 
             if (response.status === 201) {
-                Alert.alert("Success", "Account created. Please log in.");
-                setIsRegistering(false); // Switch back to login
+                await AsyncStorage.setItem("accessToken", data.tokens.access);
+                await AsyncStorage.setItem("refreshToken", data.tokens.refresh);
+                setUserName(username);
+                setModalVisible(false);
+
             } else {
                 Alert.alert("Error", data.message);
             }
@@ -109,6 +116,8 @@ const HomePage: React.FC = () => {
             Alert.alert("Error", "Something went wrong. Please try again.");
         }
     };
+   
+    
     
 
 
@@ -153,7 +162,7 @@ const HomePage: React.FC = () => {
                             </>
                         )}
 
-                        <TextInput style={styles.input} placeholder="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" placeholderTextColor="#888"/>
+                        <TextInput style={styles.input} placeholder="Email" value={username} onChangeText={setUsername} keyboardType="email-address" autoCapitalize="none" placeholderTextColor="#888"/>
                         <TextInput style={styles.input} placeholder="Password" value={password} onChangeText={setPassword} secureTextEntry placeholderTextColor="#888"/>
 
                         {loading ? (
