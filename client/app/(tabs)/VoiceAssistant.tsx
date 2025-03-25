@@ -40,7 +40,7 @@ const VoiceAssistant: React.FC = () => {
     const [duration, setDuration] = useState(0); // Track recording duration
     const durationRef = useRef(0); // Ref to store duration for cleanup
     const intervalRef = useRef<NodeJS.Timeout | null>(null); // Ref for the interval
-
+    const [threadId, setThreadId] = useState<string | null>(null);
 
     useEffect(() => {
         if (scrollViewRef.current) {
@@ -65,6 +65,33 @@ const VoiceAssistant: React.FC = () => {
             keyboardDidHideListener.remove();
         };
     }, []);
+
+    useEffect(() => {
+        const savedThreadId = startNewConversation();
+    }, []);
+
+    const startNewConversation = async () => {
+        try {
+            const accessToken = await AsyncStorage.getItem("accessToken");
+            const response = await fetch("http://192.168.2.68:8000/api/start_new_conversation/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${accessToken}`
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                setThreadId(data.thread_id);
+                await AsyncStorage.setItem("threadId", data.thread_id);
+            } else {
+                console.error("Failed to start new conversation");
+            }
+        } catch (error) {
+            console.error("Error creating new thread:", error);
+        }
+    };
 
     //THIS
     const refreshAccessToken = async () => {
@@ -112,7 +139,7 @@ const VoiceAssistant: React.FC = () => {
                         "Content-Type": "application/json",
                         "Authorization": `Bearer ${accessToken}` // Attach JWT
                     },
-                    body: JSON.stringify({ message: input }),
+                    body: JSON.stringify({ message: input, thread_id: threadId}),
                 });
     
                if (response.status === 401) {
@@ -245,7 +272,25 @@ const playAudio = async (audioUri: string) => {
             setMessages((prevMessages) => [...prevMessages, newMessage]);
             const accessToken = await AsyncStorage.getItem("accessToken");
             const uploadUrl = "http://192.168.2.68:8000/api/chat/";
+            const formData = new FormData();
+
+            formData.append("audio", {
+                uri,
+                name: "recording.wav",
+                type: "audio/wav",
+            } as any); // Casting to satisfy TypeScript
+            if (threadId) {
+                formData.append("thread_id", threadId);
+            }
     
+            const response = await fetch(uploadUrl, {
+                method: "POST",
+                headers: {
+                    "Authorization": `Bearer ${accessToken}`,
+                },
+                body: formData,
+            });
+    /*
             const response = await FileSystem.uploadAsync(uploadUrl, uri, {
                 fieldName: "audio",
                 httpMethod: "POST",
@@ -253,15 +298,17 @@ const playAudio = async (audioUri: string) => {
                 headers: {
                     "Authorization": `Bearer ${accessToken}`, // Attach JWT
                 },
+                
             });
-    
+    */
             if (response.status === 401) {
                 // If unauthorized, refresh token and retry
                 await refreshAccessToken();
                 return stopRecording();
             }
     
-            const data = JSON.parse(response.body);
+            //const data = JSON.parse(response.body);
+            const data = await response.json();
             const botMessage = data.answer || "Sorry, I did not understand that.";
     
             setMessages((prevMessages) => [
