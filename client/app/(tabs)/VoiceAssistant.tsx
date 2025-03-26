@@ -20,6 +20,15 @@ import { recordSpeech } from "@/functions/recordSpeech";
 import * as FileSystem from 'expo-file-system';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import  setModalVisible  from './index';
+import {useRouter} from 'expo-router';
+import { useRoute, useNavigation } from '@react-navigation/native'; // Import hooks
+import { RouteProp } from '@react-navigation/native';
+import { RootStackParamList } from '../../types';
+
+type VoiceAssistantRouteProp = RouteProp<RootStackParamList, 'VoiceAssistant'>;
+
+
+
 interface Message {
     text: string;
     sender: 'user' | 'bot';
@@ -40,7 +49,10 @@ const VoiceAssistant: React.FC = () => {
     const [duration, setDuration] = useState(0); // Track recording duration
     const durationRef = useRef(0); // Ref to store duration for cleanup
     const intervalRef = useRef<NodeJS.Timeout | null>(null); // Ref for the interval
-    const [threadId, setThreadId] = useState<string | null>(null);
+    const [thread_Id, setThreadId] = useState<string | null>(null);
+    const navigation = useNavigation();
+    const route = useRoute<VoiceAssistantRouteProp>();
+    const { threadId } = route.params;    
 
     useEffect(() => {
         if (scrollViewRef.current) {
@@ -66,9 +78,57 @@ const VoiceAssistant: React.FC = () => {
         };
     }, []);
 
+
     useEffect(() => {
-        const savedThreadId = startNewConversation();
+        const loadThread = async () => {
+            // Check if a thread summary was passed from HomePage
+            //const passedThreadSummary = router.getParam('threadId');
+            //const passedThreadId = router.params('threadId');
+
+            if (threadId) {
+                // Load existing thread messages
+                await loadExistingThread(threadId);
+            } else {
+                // Start a new conversation if no thread specified
+                await startNewConversation();
+            }
+        };
+
+        loadThread();
     }, []);
+
+    const loadExistingThread = async (thread: string) => {
+        try {
+            const accessToken = await AsyncStorage.getItem("accessToken");
+            const response = await fetch(`http://192.168.2.68:8000/api/get_thread_messages/`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${accessToken}`
+                },
+                body: JSON.stringify({ thread_id: thread })
+            });
+
+            const responseText = await response.text(); // Capture raw response for debugging
+
+            const data = JSON.parse(responseText); // Parse only after confirming response is OK
+
+            const threadMessages = data.map((msg: { content: string; sender: string; created_at: string }) => ({
+                text: msg.content || "",
+                sender: msg.sender === "user" ? "user" : "bot",
+                //audioUri: msg.audio_url || null,
+                //duration: msg.duration || null,
+                createdAt: new Date(msg.created_at).toLocaleString()
+            }));
+
+            setMessages(prevMessages => [...prevMessages, ...threadMessages]);
+            setThreadId(thread)
+
+            
+            } catch (error) {
+                console.error("Error loading thread messages:", error);
+            }
+    };
 
     const startNewConversation = async () => {
         try {
@@ -139,7 +199,7 @@ const VoiceAssistant: React.FC = () => {
                         "Content-Type": "application/json",
                         "Authorization": `Bearer ${accessToken}` // Attach JWT
                     },
-                    body: JSON.stringify({ message: input, thread_id: threadId}),
+                    body: JSON.stringify({ message: input, thread_id: thread_Id}),
                 });
     
                if (response.status === 401) {
@@ -279,8 +339,8 @@ const playAudio = async (audioUri: string) => {
                 name: "recording.wav",
                 type: "audio/wav",
             } as any); // Casting to satisfy TypeScript
-            if (threadId) {
-                formData.append("thread_id", threadId);
+            if (thread_Id) {
+                formData.append("thread_id", thread_Id);
             }
     
             const response = await fetch(uploadUrl, {

@@ -1,11 +1,18 @@
 //homepage
 import React, { useState, useEffect } from "react";
-import {View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, TextInput, Modal, Alert, ActivityIndicator } from 'react-native';
+import {View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, TextInput, Modal, Alert, ActivityIndicator , RefreshControl, Dimensions} from 'react-native';
+import { scale, verticalScale, moderateScale } from 'react-native-size-matters';
 import {Ionicons} from '@expo/vector-icons';
 import {useRouter} from 'expo-router';
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useRoute, useNavigation } from '@react-navigation/native';
+import { RootStackParamList } from '../../types'; // Import the type
+import { StackNavigationProp } from '@react-navigation/stack';
+
+type HomePageNavigationProp = StackNavigationProp<RootStackParamList, 'HomePage'>;
 
 const HomePage: React.FC = () => {
+    const navigation = useNavigation<HomePageNavigationProp>();
     const router = useRouter();
     const [isModalVisible, setModalVisible] = useState(false);
     const [isRegistering, setIsRegistering] = useState(false);
@@ -16,10 +23,48 @@ const HomePage: React.FC = () => {
     const [loading, setLoading] = useState(false);
     const [userName, setUserName] = useState<string | null>(null);
     const [threads, setThreads] = useState<any[]>([]);
+    const [isThreadLoading, setIsThreadLoading] = useState(false);
 
     useEffect(() => {
         checkIfLoggedIn();
     }, []);
+
+    useEffect(() => {
+        if (userName) {
+            fetchUserThreads();
+        }
+    }, [userName]);
+
+    const fetchUserThreads = async () => {
+        try {
+            const accessToken = await AsyncStorage.getItem("accessToken");
+            const response = await fetch('http://192.168.2.68:8000/api/get_user_threads/', {
+                method: "GET",
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${accessToken}`
+                },
+            });
+
+            const data = await response.json();
+            if (response.status === 200) {
+                setThreads(data);
+            } else {
+                Alert.alert("Error", "Could not fetch conversation threads");
+            }
+            
+        } catch (error) {
+            console.error("Error fetching threads:", error);
+            Alert.alert("Error", "Something went wrong fetching conversations");
+        }finally {
+            setIsThreadLoading(false);
+        }
+    };
+
+    const handleThreadSelect = (threadId: string) => {
+        // Navigate to VoiceAssistant with the selected thread
+        navigation.navigate('VoiceAssistant', { threadId });
+    };
 
     const handleLogout = async () => {
         Alert.alert(
@@ -116,21 +161,23 @@ const HomePage: React.FC = () => {
             Alert.alert("Error", "Something went wrong. Please try again.");
         }
     };
-   
-    
-    
-
 
     return (
         <SafeAreaView style={styles.container}>
-            <ScrollView contentContainerStyle={styles.scrollView}>
-                <Text style={styles.title}>AI First Aid Assistant</Text>
-                <Text style={styles.subtitle}>How can we help you today?</Text>
-
+            <ScrollView contentContainerStyle={styles.scrollView} refreshControl={
+                    <RefreshControl
+                        refreshing={isThreadLoading}
+                        onRefresh={fetchUserThreads}
+                        colors={['#007AFF']}
+                    />
+                }>
                 <TouchableOpacity style={styles.signOutButton} onPress={handleLogout}>
                 <Ionicons name="log-out-outline" size={24} color="red" />
                 </TouchableOpacity>
+                <Text style={styles.title}>AI First Aid Assistant</Text>
+                <Text style={styles.subtitle}>How can we help you today?</Text>
 
+                
                 <TouchableOpacity
                     style={styles.button}
                     onPress={() => router.push('/VoiceAssistant')}
@@ -147,7 +194,34 @@ const HomePage: React.FC = () => {
                     <Text style={styles.buttonText}>Videos</Text>
                 </TouchableOpacity>
 
-                <Text style={styles.helpText}>Tap a button to get started</Text>
+                <Text style={styles.subtitle}>Conversation History</Text>
+
+                <View style={styles.threadsContainer}>
+                    {threads.map((thread) => (
+                        <TouchableOpacity 
+                            key={thread.openai_thread_id} 
+                            style={styles.threadCard}
+                            onPress={() => handleThreadSelect(thread.openai_thread_id)}
+                        >
+                            <Text style={styles.threadPreview}>
+                            {new Date(thread.created_at).toLocaleString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                            })}
+                            </Text>
+                            <Text style={styles.threadTitle} numberOfLines={2}>
+                                {thread.summary || "Untitled"}
+                            </Text>
+                        </TouchableOpacity>
+                    ))}
+                </View>
+
+          
+
+                
             </ScrollView>
 
             <Modal visible={isModalVisible} animationType="slide" transparent>
@@ -186,6 +260,7 @@ const HomePage: React.FC = () => {
         </SafeAreaView>
     );
 };
+const { width, height } = Dimensions.get('window');
 
 const styles = StyleSheet.create({
     container: {
@@ -196,14 +271,17 @@ const styles = StyleSheet.create({
         flexGrow: 1,
         justifyContent: 'center',
         alignItems: 'center',
-        paddingVertical: 30,
+        paddingVertical: moderateScale(30),
     },
     title: {
-        fontSize: 28,
+        fontSize: scale(28),
         fontWeight: 'bold',
+        marginTop: moderateScale(35),
         color: '#333',
-        marginBottom: 10,
+        marginBottom: moderateScale(10),
         textAlign: 'center',
+
+        
     },
     subtitle: {
         fontSize: 18,
@@ -284,13 +362,39 @@ const styles = StyleSheet.create({
 
     signOutButton: {
         position: 'absolute',
-        top: 20,
-        right: 20,
-        padding: 10,
+        top: moderateScale(20),
+        right: moderateScale(20),
+        padding: moderateScale(10),
         backgroundColor: 'white',
         borderRadius: 50,
         elevation: 5,
-    }
+        zIndex: 10,
+    },
+    threadsContainer: {
+        marginVertical: 0,
+    },
+    threadCard: {
+        backgroundColor: '#f0f0f0',
+        borderRadius: 10,
+        padding: 15,
+        marginVertical: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+        width: width * 0.7, 
+        height: verticalScale(70),
+     
+    },
+    threadTitle: {
+        fontSize: 16,
+        fontWeight: 'bold',
+        marginBottom: 5,
+    },
+    threadPreview: {
+        color: '#666',
+    },
 });
 
 export default HomePage;
