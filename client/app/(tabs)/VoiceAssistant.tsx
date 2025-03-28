@@ -19,15 +19,25 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { recordSpeech } from "@/functions/recordSpeech";
 import * as FileSystem from 'expo-file-system';
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import  setModalVisible  from './index';
 import {useRouter} from 'expo-router';
 import { useRoute, useNavigation } from '@react-navigation/native'; // Import hooks
 import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../types';
+import { StackNavigationProp } from '@react-navigation/stack';
 
 type VoiceAssistantRouteProp = RouteProp<RootStackParamList, 'VoiceAssistant'>;
 
+export const refreshAccessToken = async () => {
+    const refreshToken = await AsyncStorage.getItem("refreshToken");
+    const response = await fetch("http://192.168.2.68:8000/api/token/refresh/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refresh: refreshToken }),
+    });
 
+    const data = await response.json();
+    await AsyncStorage.setItem("accessToken", data.access);
+};
 
 interface Message {
     text: string;
@@ -81,9 +91,6 @@ const VoiceAssistant: React.FC = () => {
 
     useEffect(() => {
         const loadThread = async () => {
-            // Check if a thread summary was passed from HomePage
-            //const passedThreadSummary = router.getParam('threadId');
-            //const passedThreadId = router.params('threadId');
 
             if (threadId) {
                 // Load existing thread messages
@@ -109,17 +116,24 @@ const VoiceAssistant: React.FC = () => {
                 body: JSON.stringify({ thread_id: thread })
             });
 
+            if (response.status === 401) {
+                await refreshAccessToken();
+                return loadExistingThread(thread); // Retry request
+            }
+
             const responseText = await response.text(); // Capture raw response for debugging
 
             const data = JSON.parse(responseText); // Parse only after confirming response is OK
 
-            const threadMessages = data.map((msg: { content: string; sender: string; created_at: string }) => ({
-                text: msg.content || "",
+            const threadMessages = data.map((msg: { content?: string; sender: string; created_at: string; audio?: string; duration?: number}) => ({
+                text: msg.content || null,
                 sender: msg.sender === "user" ? "user" : "bot",
-                //audioUri: msg.audio_url || null,
-                //duration: msg.duration || null,
+                audioUri: msg.audio || null,
+                duration: msg.duration || null,
                 createdAt: new Date(msg.created_at).toLocaleString()
             }));
+
+            console.log("Playing Audio from URL:", data);
 
             setMessages(prevMessages => [...prevMessages, ...threadMessages]);
             setThreadId(thread)
@@ -129,6 +143,7 @@ const VoiceAssistant: React.FC = () => {
                 console.error("Error loading thread messages:", error);
             }
     };
+    
 
     const startNewConversation = async () => {
         try {
@@ -140,6 +155,12 @@ const VoiceAssistant: React.FC = () => {
                     "Authorization": `Bearer ${accessToken}`
                 }
             });
+
+            if (response.status === 401) {
+                // If unauthorized, refresh token and retry
+                await refreshAccessToken();
+                return startNewConversation();
+            }
 
             if (response.ok) {
                 const data = await response.json();
@@ -153,60 +174,35 @@ const VoiceAssistant: React.FC = () => {
         }
     };
 
-    //THIS
-    const refreshAccessToken = async () => {
-        const refreshToken = await AsyncStorage.getItem("refreshToken");
-    
-        if (!refreshToken) {
-            setModalVisible(true); // Force re-login if refresh token is missing
-            return;
-        }
-    
-        try {
-            const response = await fetch("http://192.168.2.68:8000/api/token/refresh/", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ refresh: refreshToken }),
-            });
-    
-            const data = await response.json();
-    
-            if (response.status === 200) {
-                await AsyncStorage.setItem("accessToken", data.access); // Update access token
-            } else {
-                await AsyncStorage.removeItem("refreshToken");
-                setModalVisible(true); // Force re-login
-            }
-        } catch (error) {
-            console.error("Error refreshing token:", error);
-            await AsyncStorage.removeItem("refreshToken");
-            setModalVisible(true); // Force re-login
-        }
-    };
-
 
     const handleSend = async () => {
         if (input.trim()) {
             const newMessage = { text: input, sender: "user" as const };
             setMessages((prevMessages) => [...prevMessages, newMessage]);
             setInput('');
-    
-            try {
-                const accessToken = await AsyncStorage.getItem("accessToken");   
+        
+            const sendMessageRequest = async (retry: boolean = true) => {
+                let accessToken = await AsyncStorage.getItem("accessToken");
+        
                 const response = await fetch("http://192.168.2.68:8000/api/chat/", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
-                        "Authorization": `Bearer ${accessToken}` // Attach JWT
+                        "Authorization": `Bearer ${accessToken}`, // Attach JWT
                     },
-                    body: JSON.stringify({ message: input, thread_id: thread_Id}),
+                    body: JSON.stringify({ message: input, thread_id: thread_Id }),
                 });
-    
-               if (response.status === 401) {
-                    // If unauthorized, try refreshing token
+        
+                if (response.status === 401 && retry) {
                     await refreshAccessToken();
-                    return handleSend(); // Retry request
+                    return sendMessageRequest(false); // Retry once after refreshing token
                 }
+        
+                return response;
+            };
+    
+            try {
+                const response = await sendMessageRequest();
                 const data = await response.json();
                 const botMessage = data.answer || "Sorry, I did not understand that.";
     
@@ -226,56 +222,56 @@ const VoiceAssistant: React.FC = () => {
     
 
     const currentSoundRef = useRef<Audio.Sound | null>(null);
-const currentlyPlayingUriRef = useRef<string | null>(null);
-const [isPlaying, setIsPlaying] = useState(false);
+    const currentlyPlayingUriRef = useRef<string | null>(null);
+    const [isPlaying, setIsPlaying] = useState(false);
 
-const playAudio = async (audioUri: string) => {
-    try {
-        // If the same audio is already playing, stop and unload it
-        if (currentlyPlayingUriRef.current === audioUri && isPlaying) {
+    const playAudio = async (audioUri: string) => {
+        try {
+            // If the same audio is already playing, stop and unload it
+            if (currentlyPlayingUriRef.current === audioUri && isPlaying) {
+                if (currentSoundRef.current) {
+                    await currentSoundRef.current.stopAsync();
+                    await currentSoundRef.current.unloadAsync();
+                    currentSoundRef.current = null;
+                    currentlyPlayingUriRef.current = null;
+                    setIsPlaying(false);
+                }
+                return;
+            }
+
+            // Stop any currently playing audio
             if (currentSoundRef.current) {
                 await currentSoundRef.current.stopAsync();
                 await currentSoundRef.current.unloadAsync();
                 currentSoundRef.current = null;
-                currentlyPlayingUriRef.current = null;
-                setIsPlaying(false);
             }
-            return;
+
+            // Load and play the new audio
+            const { sound } = await Audio.Sound.createAsync(
+                { uri: audioUri },
+                { shouldPlay: true }
+            );
+
+            currentSoundRef.current = sound;
+            currentlyPlayingUriRef.current = audioUri;
+            setIsPlaying(true);
+
+            await sound.playAsync();
+
+            // Cleanup when playback finishes
+            sound.setOnPlaybackStatusUpdate(async (status) => {
+                if (status.isLoaded && status.didJustFinish) {
+                    await sound.unloadAsync();
+                    currentSoundRef.current = null;
+                    currentlyPlayingUriRef.current = null;
+                    setIsPlaying(false);
+                }
+            });
+
+        } catch (error) {
+            console.error("Error playing audio:", audioUri, error);
         }
-
-        // Stop any currently playing audio
-        if (currentSoundRef.current) {
-            await currentSoundRef.current.stopAsync();
-            await currentSoundRef.current.unloadAsync();
-            currentSoundRef.current = null;
-        }
-
-        // Load and play the new audio
-        const { sound } = await Audio.Sound.createAsync(
-            { uri: audioUri },
-            { shouldPlay: true }
-        );
-
-        currentSoundRef.current = sound;
-        currentlyPlayingUriRef.current = audioUri;
-        setIsPlaying(true);
-
-        await sound.playAsync();
-
-        // Cleanup when playback finishes
-        sound.setOnPlaybackStatusUpdate(async (status) => {
-            if (status.isLoaded && status.didJustFinish) {
-                await sound.unloadAsync();
-                currentSoundRef.current = null;
-                currentlyPlayingUriRef.current = null;
-                setIsPlaying(false);
-            }
-        });
-
-    } catch (error) {
-        console.error("Error playing audio:", error);
-    }
-};
+    };
 
 
 
@@ -338,36 +334,36 @@ const playAudio = async (audioUri: string) => {
                 uri,
                 name: "recording.wav",
                 type: "audio/wav",
+                duration: durationRef.current,
             } as any); // Casting to satisfy TypeScript
             if (thread_Id) {
                 formData.append("thread_id", thread_Id);
             }
-    
-            const response = await fetch(uploadUrl, {
-                method: "POST",
-                headers: {
-                    "Authorization": `Bearer ${accessToken}`,
-                },
-                body: formData,
-            });
-    /*
-            const response = await FileSystem.uploadAsync(uploadUrl, uri, {
-                fieldName: "audio",
-                httpMethod: "POST",
-                uploadType: FileSystem.FileSystemUploadType.MULTIPART,
-                headers: {
-                    "Authorization": `Bearer ${accessToken}`, // Attach JWT
-                },
-                
-            });
-    */
-            if (response.status === 401) {
-                // If unauthorized, refresh token and retry
-                await refreshAccessToken();
-                return stopRecording();
+            if (durationRef.current) {
+                formData.append("duration", durationRef.current.toString());
             }
+
+            const sendAudioRequest = async (retry: boolean = true) => {
+                let accessToken = await AsyncStorage.getItem("accessToken");
     
-            //const data = JSON.parse(response.body);
+                const response = await fetch("http://192.168.2.68:8000/api/chat/", {
+                    method: "POST",
+                    headers: {
+                        "Authorization": `Bearer ${accessToken}`,
+                    },
+                    body: formData,
+                });
+    
+                if (response.status === 401 && retry) {
+                    console.log("Access token expired, refreshing token...");
+                    await refreshAccessToken();
+                    return sendAudioRequest(false); // Retry once after refreshing token
+                }
+    
+                return response;
+            };
+    
+            const response = await sendAudioRequest();
             const data = await response.json();
             const botMessage = data.answer || "Sorry, I did not understand that.";
     
@@ -391,7 +387,9 @@ const playAudio = async (audioUri: string) => {
                     <View style={styles.flexContainer}>
                         <ScrollView ref={scrollViewRef} style={styles.messagesContainer} contentContainerStyle={{ paddingBottom: 70 }}>
                             {messages.map((msg, index) => {
-                                const words = msg.text.split(/(\s+)/); // Split text while keeping spaces
+                                //const words = msg.text.split(/(\s+)/); // Split text while keeping spaces
+                                const messageText = msg.text || ""; // Ensure it's always a string
+                                const words = messageText.split(/(\s+)/);
     
                                 return (
                                     <View key={index} style={[styles.messageBubble, msg.sender === 'user' ? styles.userBubble : styles.botBubble]}>

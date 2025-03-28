@@ -1,7 +1,11 @@
 {
   "dependencies": {
     "axios": "^1.8.1",
+    "expo-module-scripts": "^4.0.4",
     "react-native-audio-recorder-player": "^3.6.12",
     "react-native-webview": "^13.13.4"
+  },
+  "devDependencies": {
+    "@types/react": "~18.3.12"
   }
 }

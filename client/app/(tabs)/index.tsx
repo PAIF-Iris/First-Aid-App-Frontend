@@ -8,6 +8,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { RootStackParamList } from '../../types'; // Import the type
 import { StackNavigationProp } from '@react-navigation/stack';
+import {refreshAccessToken}   from "./VoiceAssistant";
 
 type HomePageNavigationProp = StackNavigationProp<RootStackParamList, 'HomePage'>;
 
@@ -24,6 +25,7 @@ const HomePage: React.FC = () => {
     const [userName, setUserName] = useState<string | null>(null);
     const [threads, setThreads] = useState<any[]>([]);
     const [isThreadLoading, setIsThreadLoading] = useState(false);
+
 
     useEffect(() => {
         checkIfLoggedIn();
@@ -45,12 +47,15 @@ const HomePage: React.FC = () => {
                     "Authorization": `Bearer ${accessToken}`
                 },
             });
+            
 
             const data = await response.json();
             if (response.status === 200) {
                 setThreads(data);
-            } else {
-                Alert.alert("Error", "Could not fetch conversation threads");
+            } 
+            if (response.status === 401) {
+                await refreshAccessToken();
+                return fetchUserThreads(); // Retry request
             }
             
         } catch (error) {
@@ -64,6 +69,16 @@ const HomePage: React.FC = () => {
     const handleThreadSelect = (threadId: string) => {
         // Navigate to VoiceAssistant with the selected thread
         navigation.navigate('VoiceAssistant', { threadId });
+    };
+
+    const checkIfLoggedIn = async () => {
+        const accessToken = await AsyncStorage.getItem("accessToken");
+    
+        if (accessToken) {
+            setUserName("authenticated"); // Just a placeholder value to indicate login
+        } else {
+            setModalVisible(true); // Show login modal if token is missing
+        }
     };
 
     const handleLogout = async () => {
@@ -83,16 +98,6 @@ const HomePage: React.FC = () => {
                 }
             ]
         );
-    };
-
-    const checkIfLoggedIn = async () => {
-        const accessToken = await AsyncStorage.getItem("accessToken");
-    
-        if (accessToken) {
-            setUserName("authenticated"); // Just a placeholder value to indicate login
-        } else {
-            setModalVisible(true); // Show login modal if token is missing
-        }
     };
 
 
