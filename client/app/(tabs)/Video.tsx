@@ -1,7 +1,9 @@
 //video is from YouTube
+
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Button } from 'react-native';
 import { WebView } from 'react-native-webview';
+import * as FileSystem from "expo-file-system";
 
 const Video = () => {
     const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -120,12 +122,13 @@ const styles = StyleSheet.create({
 
 export default Video;
 
-
+/*
 //Can't use react-native-fs to test on Expo Go
-/*import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Button } from 'react-native';
 import Video from 'react-native-video'; // Used to play the video
 import RNFS from 'react-native-fs'; // For accessing the local file system
+import { Asset } from 'expo-asset';
 
 interface VideoPlayerProps {
     videoUri: string;
@@ -171,9 +174,14 @@ const VideoView = () => {
   // Function to handle section press and open video player
   const handleSectionPress = (videoFileName: string) => {
     // Construct the local video path from the app bundle
-    const localVideoUri = `${RNFS.MainBundlePath}/assets/videos/${videoFileName}`;
+    const localVideoUri = getVideoUri(videoFileName);
     setVideoUri(localVideoUri);
     setIsVideoVisible(true);
+  };
+
+  const getVideoUri = (videoFileName: string) => {
+    const videoAsset = Asset.fromModule(require(`../../assets/videos/${videoFileName}`));
+    return videoAsset.uri;
   };
 
   // Function to close the video player
@@ -262,4 +270,5 @@ const styles = StyleSheet.create({
   },
 });
 
-export default VideoView;*/
+export default VideoView;
+*/

@@ -25,6 +25,7 @@ import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../types';
 import { StackNavigationProp } from '@react-navigation/stack';
 
+
 type VoiceAssistantRouteProp = RouteProp<RootStackParamList, 'VoiceAssistant'>;
 
 export const refreshAccessToken = async () => {
@@ -63,6 +64,7 @@ const VoiceAssistant: React.FC = () => {
     const navigation = useNavigation();
     const route = useRoute<VoiceAssistantRouteProp>();
     const { threadId } = route.params;    
+    const downloadedFiles: string[] = [];
 
     useEffect(() => {
         if (scrollViewRef.current) {
@@ -103,6 +105,51 @@ const VoiceAssistant: React.FC = () => {
 
         loadThread();
     }, []);
+
+ /*   useEffect(() => {
+        return () => {
+            Promise.all(
+                downloadedFiles.map((file) => FileSystem.deleteAsync(file))
+            )
+            .then(() => console.log("All files deleted"))
+            .catch((error) => console.error("Error deleting files:", error));
+        };
+    }, []);
+*/
+    
+    //delete all downloaded files
+    useEffect(() => {
+        return () => {
+            const cleanup = async () => {
+
+                try {
+                    console.log("Starting file cleanup on page exit...");
+                    
+                    for (const file of downloadedFiles) {
+                      try {
+                        // Ensure you're using the full file URI
+                        await FileSystem.deleteAsync(file, { idempotent: true });
+                        console.log("Deleted file:", file);
+                        
+                        // Optional: Verify file deletion
+                        const fileInfo = await FileSystem.getInfoAsync(file);
+                        console.log(`File exists after delete? ${fileInfo.exists}`);
+                      } catch (error) {
+                        console.error(`Error deleting file ${file}:`, error);
+                      }
+                    }
+                    
+                    console.log("All files deleted");
+                    downloadedFiles.length = 0; // ✅ Clear array
+                  } catch (error) {
+                    console.error("Cleanup failed:", error);
+                  }
+            };
+    
+            cleanup();
+        };
+    }, []);
+    
 
     const loadExistingThread = async (thread: string) => {
         try {
@@ -225,7 +272,7 @@ const VoiceAssistant: React.FC = () => {
     const currentlyPlayingUriRef = useRef<string | null>(null);
     const [isPlaying, setIsPlaying] = useState(false);
 
-    const playAudio = async (audioUri: string) => {
+   /* const playAudio = async (audioUri: string) => {
         try {
             // If the same audio is already playing, stop and unload it
             if (currentlyPlayingUriRef.current === audioUri && isPlaying) {
@@ -270,6 +317,88 @@ const VoiceAssistant: React.FC = () => {
 
         } catch (error) {
             console.error("Error playing audio:", audioUri, error);
+        }
+    };*/
+
+    const playAudio = async (audioUri: string) => {
+        try {
+            console.log("Downloading audio...");
+            let localUri = audioUri;
+
+            if (currentlyPlayingUriRef.current === audioUri && isPlaying) {
+                if (currentSoundRef.current) {
+                    await currentSoundRef.current.stopAsync();
+                    await currentSoundRef.current.unloadAsync();
+                    currentSoundRef.current = null;
+                    currentlyPlayingUriRef.current = null;
+                    setIsPlaying(false);
+                }
+                return;
+            }
+
+            // Stop any currently playing audio
+            if (currentSoundRef.current) {
+                await currentSoundRef.current.stopAsync();
+                await currentSoundRef.current.unloadAsync();
+                currentSoundRef.current = null;
+            }
+
+
+            if (!audioUri.startsWith("file://")) {
+                // If it's a remote file, download it
+                const filename = audioUri.split("/").pop(); // Get filename from URL
+                const localPath = `${FileSystem.cacheDirectory}${filename}`;
+    
+                //const fileInfo = await FileSystem.getInfoAsync(localPath);
+
+                let fileInfo = await FileSystem.getInfoAsync(localPath);
+                console.log("Checking file existence:", localPath, fileInfo.exists);
+    
+                if (fileInfo.exists) {
+                    console.log("File already downloaded:", localPath);
+                    localUri = localPath;
+                } else {
+                    console.log("Downloading file to:", localPath);
+                    const downloadResumable = FileSystem.createDownloadResumable(
+                        audioUri,
+                        localPath
+                    );
+    
+                    const result = await downloadResumable.downloadAsync();
+
+                    if (!result || !result.uri) {
+                        throw new Error("Failed to download audio file.");
+                    }
+    
+                    localUri = result.uri;
+                    downloadedFiles.push(localUri);
+                    console.log(downloadedFiles)
+                }
+            }
+
+            console.log("Playing downloaded audio:", localUri);
+            const { sound } = await Audio.Sound.createAsync(
+                { uri : localUri},
+                { shouldPlay: true }
+            );
+
+            currentSoundRef.current = sound;
+            currentlyPlayingUriRef.current = audioUri;
+            setIsPlaying(true);
+            await sound.playAsync();
+
+
+            sound.setOnPlaybackStatusUpdate(async (status) => {
+                if (status.isLoaded && status.didJustFinish) {
+                    await sound.unloadAsync();
+                    currentSoundRef.current = null;
+                    currentlyPlayingUriRef.current = null;
+                    setIsPlaying(false);
+                }
+            });
+
+        } catch (error) {
+            console.error("Error playing audio:", error);
         }
     };
 
