@@ -30,7 +30,7 @@ type VoiceAssistantRouteProp = RouteProp<RootStackParamList, 'VoiceAssistant'>;
 
 export const refreshAccessToken = async () => {
     const refreshToken = await AsyncStorage.getItem("refreshToken");
-    const response = await fetch("http://192.168.2.68:8000/api/token/refresh/", {
+    const response = await fetch("http://172.105.105.81:8000/api/token/refresh/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refresh: refreshToken }),
@@ -154,7 +154,7 @@ const VoiceAssistant: React.FC = () => {
     const loadExistingThread = async (thread: string) => {
         try {
             const accessToken = await AsyncStorage.getItem("accessToken");
-            const response = await fetch(`http://192.168.2.68:8000/api/get_thread_messages/`, {
+            const response = await fetch(`http://172.105.105.81:8000/api/get_thread_messages/`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -195,7 +195,7 @@ const VoiceAssistant: React.FC = () => {
     const startNewConversation = async () => {
         try {
             const accessToken = await AsyncStorage.getItem("accessToken");
-            const response = await fetch("http://192.168.2.68:8000/api/start_new_conversation/", {
+            const response = await fetch("http://172.105.105.81:8000/api/start_new_conversation/", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -231,7 +231,7 @@ const VoiceAssistant: React.FC = () => {
             const sendMessageRequest = async (retry: boolean = true) => {
                 let accessToken = await AsyncStorage.getItem("accessToken");
         
-                const response = await fetch("http://192.168.2.68:8000/api/chat/", {
+                const response = await fetch("http://172.105.105.81:8000/api/chat/", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
@@ -456,7 +456,7 @@ const VoiceAssistant: React.FC = () => {
             const newMessage = { text: "Voice message", sender: "user" as const, audioUri: uri, duration: durationRef.current };
             setMessages((prevMessages) => [...prevMessages, newMessage]);
             const accessToken = await AsyncStorage.getItem("accessToken");
-            const uploadUrl = "http://192.168.2.68:8000/api/chat/";
+            const uploadUrl = "http://172.105.105.81:8000/api/chat/";
             const formData = new FormData();
 
             formData.append("audio", {
@@ -475,7 +475,7 @@ const VoiceAssistant: React.FC = () => {
             const sendAudioRequest = async (retry: boolean = true) => {
                 let accessToken = await AsyncStorage.getItem("accessToken");
     
-                const response = await fetch("http://192.168.2.68:8000/api/chat/", {
+                const response = await fetch("http://172.105.105.81:8000/api/chat/", {
                     method: "POST",
                     headers: {
                         "Authorization": `Bearer ${accessToken}`,

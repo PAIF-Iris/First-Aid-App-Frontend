@@ -40,7 +40,7 @@ const HomePage: React.FC = () => {
     const fetchUserThreads = async () => {
         try {
             const accessToken = await AsyncStorage.getItem("accessToken");
-            const response = await fetch('http://192.168.2.68:8000/api/get_user_threads/', {
+            const response = await fetch('http://172.105.105.81:8000/api/get_user_threads/', {
                 method: "GET",
                 headers: { 
                     "Content-Type": "application/json",
@@ -109,7 +109,7 @@ const HomePage: React.FC = () => {
         setLoading(true);
 
         try {
-            const response = await fetch('http://192.168.2.68:8000/api/login/', {
+            const response = await fetch('http://172.105.105.81:8000/api/login/', {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ username, password }),
@@ -143,7 +143,7 @@ const HomePage: React.FC = () => {
         setLoading(true);
 
         try {
-            const response = await fetch('http://192.168.2.68:8000/api/register/', {
+            const response = await fetch('http://172.105.105.81:8000/api/register/', {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ username, password, name, age }),
