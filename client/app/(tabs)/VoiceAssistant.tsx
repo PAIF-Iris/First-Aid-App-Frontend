@@ -12,7 +12,8 @@ import {
     Keyboard,
     TouchableWithoutFeedback,
     LayoutAnimation,
-    Linking
+    Linking,
+    ActivityIndicator
 } from 'react-native';
 import { Audio } from 'expo-av';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -45,6 +46,8 @@ interface Message {
     sender: 'user' | 'bot';
     audioUri?: string; 
     duration?: number;
+    loading?: boolean;
+    id?: string;
 }
 
 const VoiceAssistant: React.FC = () => {
@@ -65,6 +68,8 @@ const VoiceAssistant: React.FC = () => {
     const route = useRoute<VoiceAssistantRouteProp>();
     const { threadId } = route.params;    
     const downloadedFiles: string[] = [];
+    const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
+    
 
     useEffect(() => {
         if (scrollViewRef.current) {
@@ -123,23 +128,19 @@ const VoiceAssistant: React.FC = () => {
             const cleanup = async () => {
 
                 try {
-                    console.log("Starting file cleanup on page exit...");
                     
                     for (const file of downloadedFiles) {
                       try {
                         // Ensure you're using the full file URI
                         await FileSystem.deleteAsync(file, { idempotent: true });
-                        console.log("Deleted file:", file);
                         
                         // Optional: Verify file deletion
                         const fileInfo = await FileSystem.getInfoAsync(file);
-                        console.log(`File exists after delete? ${fileInfo.exists}`);
                       } catch (error) {
                         console.error(`Error deleting file ${file}:`, error);
                       }
                     }
                     
-                    console.log("All files deleted");
                     downloadedFiles.length = 0; // ✅ Clear array
                   } catch (error) {
                     console.error("Cleanup failed:", error);
@@ -180,7 +181,6 @@ const VoiceAssistant: React.FC = () => {
                 createdAt: new Date(msg.created_at).toLocaleString()
             }));
 
-            console.log("Playing Audio from URL:", data);
 
             setMessages(prevMessages => [...prevMessages, ...threadMessages]);
             setThreadId(thread)
@@ -223,10 +223,19 @@ const VoiceAssistant: React.FC = () => {
 
 
     const handleSend = async () => {
+        if (!input.trim() || isWaitingForResponse) {
+            return;
+        }
+    
+        setIsWaitingForResponse(true);
+
         if (input.trim()) {
             const newMessage = { text: input, sender: "user" as const };
             setMessages((prevMessages) => [...prevMessages, newMessage]);
             setInput('');
+
+            const loadingMessage = { id: 'loading', text: '...', sender: "bot" as const, loading: true };
+            setMessages((prevMessages) => [...prevMessages, loadingMessage]);
         
             const sendMessageRequest = async (retry: boolean = true) => {
                 let accessToken = await AsyncStorage.getItem("accessToken");
@@ -252,17 +261,30 @@ const VoiceAssistant: React.FC = () => {
                 const response = await sendMessageRequest();
                 const data = await response.json();
                 const botMessage = data.answer || "Sorry, I did not understand that.";
+
+                setMessages((prevMessages) =>
+                    prevMessages.map((msg) =>
+                        msg.id === 'loading'
+                            ? { text: botMessage, sender: "bot" as const }
+                            : msg
+                    )
+                );
     
-                setMessages((prevMessages) => [
+                /*setMessages((prevMessages) => [
                     ...prevMessages,
                     { text: botMessage, sender: "bot" as const },
-                ]);
+                ]);*/
             } catch (error) {
                 console.error("Error communicating with backend API:", error);
-                setMessages((prevMessages) => [
-                    ...prevMessages,
-                    { text: "Sorry, something went wrong.", sender: "bot" as const },
-                ]);
+                setMessages((prevMessages) =>
+                    prevMessages.map((msg) =>
+                        msg.id === 'loading'
+                            ? { text: "Sorry, something went wrong.", sender: "bot" as const }
+                            : msg
+                    )
+                );
+            } finally {
+                setIsWaitingForResponse(false);
             }
         }
     };
@@ -322,7 +344,6 @@ const VoiceAssistant: React.FC = () => {
 
     const playAudio = async (audioUri: string) => {
         try {
-            console.log("Downloading audio...");
             let localUri = audioUri;
 
             if (currentlyPlayingUriRef.current === audioUri && isPlaying) {
@@ -352,13 +373,10 @@ const VoiceAssistant: React.FC = () => {
                 //const fileInfo = await FileSystem.getInfoAsync(localPath);
 
                 let fileInfo = await FileSystem.getInfoAsync(localPath);
-                console.log("Checking file existence:", localPath, fileInfo.exists);
     
                 if (fileInfo.exists) {
-                    console.log("File already downloaded:", localPath);
                     localUri = localPath;
                 } else {
-                    console.log("Downloading file to:", localPath);
                     const downloadResumable = FileSystem.createDownloadResumable(
                         audioUri,
                         localPath
@@ -372,11 +390,9 @@ const VoiceAssistant: React.FC = () => {
     
                     localUri = result.uri;
                     downloadedFiles.push(localUri);
-                    console.log(downloadedFiles)
                 }
             }
 
-            console.log("Playing downloaded audio:", localUri);
             const { sound } = await Audio.Sound.createAsync(
                 { uri : localUri},
                 { shouldPlay: true }
@@ -441,6 +457,13 @@ const VoiceAssistant: React.FC = () => {
     
     const stopRecording = async () => {
         setIsRecording(false);
+        if (isWaitingForResponse) {
+            return;
+        }
+
+        setIsWaitingForResponse(true);
+    
+        setIsWaitingForResponse(true);
         if (intervalRef.current) {
             clearInterval(intervalRef.current);
             intervalRef.current = null;
@@ -455,6 +478,10 @@ const VoiceAssistant: React.FC = () => {
             }
             const newMessage = { text: "Voice message", sender: "user" as const, audioUri: uri, duration: durationRef.current };
             setMessages((prevMessages) => [...prevMessages, newMessage]);
+
+            const loadingMessage: Message = { id: 'loading', text: '...', sender: "bot" as const, loading: true };
+            setMessages((prevMessages) => [...prevMessages, loadingMessage]);
+
             const accessToken = await AsyncStorage.getItem("accessToken");
             const uploadUrl = "http://172.105.105.81:8000/api/chat/";
             const formData = new FormData();
@@ -484,7 +511,6 @@ const VoiceAssistant: React.FC = () => {
                 });
     
                 if (response.status === 401 && retry) {
-                    console.log("Access token expired, refreshing token...");
                     await refreshAccessToken();
                     return sendAudioRequest(false); // Retry once after refreshing token
                 }
@@ -496,16 +522,26 @@ const VoiceAssistant: React.FC = () => {
             const data = await response.json();
             const botMessage = data.answer || "Sorry, I did not understand that.";
     
-            setMessages((prevMessages) => [
-                ...prevMessages,
-                { text: botMessage, sender: "bot" as const },
-            ]);
+        
+            setMessages((prevMessages) =>
+                prevMessages.map((msg) =>
+                    msg.id === 'loading'
+                        ? { text: botMessage, sender: "bot" as const }
+                        : msg
+                )
+            );
         } catch (error) {
             console.error("Error processing audio:", error);
-            setMessages((prevMessages) => [
-                ...prevMessages,
-                { text: "Sorry, something went wrong with voice processing.", sender: "bot" as const },
-            ]);
+            
+            setMessages((prevMessages) =>
+                prevMessages.map((msg) =>
+                    msg.id === 'loading'
+                        ? { text: "Sorry, something went wrong.", sender: "bot" as const }
+                        : msg
+                )
+            );
+        } finally {
+            setIsWaitingForResponse(false);
         }
     };
 
@@ -522,7 +558,13 @@ const VoiceAssistant: React.FC = () => {
     
                                 return (
                                     <View key={index} style={[styles.messageBubble, msg.sender === 'user' ? styles.userBubble : styles.botBubble]}>
-                                        {msg.audioUri ? (
+                                        {msg.loading ? (
+                                        <View style={styles.loadingContainer}>
+                                            {/* You can adjust the size/color of the spinner */}
+                                            <ActivityIndicator size="small" color="#555" />
+                                            <Text style={styles.loadingText}>AI is typing...</Text>
+                                        </View>
+                                    ) : msg.audioUri ? (
                                             <TouchableOpacity
                                                 onPress={() => playAudio(msg.audioUri!)}
                                                 style={[
@@ -620,6 +662,18 @@ const styles = StyleSheet.create({
         color: '#007AFF',
         textDecorationLine: 'underline',
     },
+    loadingContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 10,
+    },
+    loadingText: {
+        marginLeft: 10,
+        color: '#555',
+        fontSize: 14,
+        fontStyle: 'italic',
+    }
 });
 
 

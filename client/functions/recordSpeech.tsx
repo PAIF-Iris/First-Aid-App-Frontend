@@ -59,7 +59,6 @@ export const recordSpeech = async (
 
         await audioRecordingRef?.current
           ?.prepareToRecordAsync(recordingOptions)
-          .then(() => console.log("✅ Prepared recording instance"))
           .catch((e) => {
             console.error("Failed to prepare recording", e);
           });
