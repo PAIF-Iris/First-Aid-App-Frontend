@@ -13,7 +13,8 @@ import {
     TouchableWithoutFeedback,
     LayoutAnimation,
     Linking,
-    ActivityIndicator
+    ActivityIndicator,
+    Alert
 } from 'react-native';
 import { Audio } from 'expo-av';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -25,11 +26,18 @@ import { useRoute, useNavigation } from '@react-navigation/native'; // Import ho
 import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../types';
 import { StackNavigationProp } from '@react-navigation/stack';
+import NetInfo from '@react-native-community/netinfo';
 
 
 type VoiceAssistantRouteProp = RouteProp<RootStackParamList, 'VoiceAssistant'>;
 
 export const refreshAccessToken = async () => {
+    const state = await NetInfo.fetch();
+    if (!state.isConnected) {
+        Alert.alert("Error", "Please check your network and try again.");
+        return;
+    }
+
     const refreshToken = await AsyncStorage.getItem("refreshToken");
     const response = await fetch("http://172.105.105.81:8000/api/token/refresh/", {
         method: "POST",
@@ -150,10 +158,21 @@ const VoiceAssistant: React.FC = () => {
             cleanup();
         };
     }, []);
+
+    const checkConnectionStatus = async () => {
+        const state = await NetInfo.fetch();
+        return state.isConnected;
+      };
     
 
     const loadExistingThread = async (thread: string) => {
         try {
+
+            const isConnected = await checkConnectionStatus();
+            if (!isConnected) {
+                Alert.alert("Error", "Please check your network and try again.");
+                return;
+            }
             const accessToken = await AsyncStorage.getItem("accessToken");
             const response = await fetch(`http://172.105.105.81:8000/api/get_thread_messages/`, {
                 method: "POST",
@@ -194,6 +213,12 @@ const VoiceAssistant: React.FC = () => {
 
     const startNewConversation = async () => {
         try {
+            const isConnected = await checkConnectionStatus();
+            if (!isConnected) {
+                Alert.alert("Error", "Please check your network and try again.");
+                return;
+            }
+
             const accessToken = await AsyncStorage.getItem("accessToken");
             const response = await fetch("http://172.105.105.81:8000/api/start_new_conversation/", {
                 method: "POST",
@@ -223,6 +248,12 @@ const VoiceAssistant: React.FC = () => {
 
 
     const handleSend = async () => {
+        const isConnected = await checkConnectionStatus();
+            if (!isConnected) {
+                Alert.alert("Error", "Please check your network and try again.");
+                return;
+        }
+
         if (!input.trim() || isWaitingForResponse) {
             return;
         }
@@ -469,6 +500,7 @@ const VoiceAssistant: React.FC = () => {
             intervalRef.current = null;
         }
         if (!audioRecordingRef.current) return;
+
         try {
             await audioRecordingRef.current.stopAndUnloadAsync();
             const uri = audioRecordingRef.current.getURI();

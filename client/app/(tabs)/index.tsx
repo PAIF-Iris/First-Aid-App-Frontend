@@ -9,6 +9,10 @@ import { useRoute, useNavigation } from '@react-navigation/native';
 import { RootStackParamList } from '../../types'; // Import the type
 import { StackNavigationProp } from '@react-navigation/stack';
 import {refreshAccessToken}   from "./VoiceAssistant";
+import { Linking } from 'react-native';
+import { Keyboard, TouchableWithoutFeedback } from 'react-native';
+import Toast from 'react-native-toast-message';
+import NetInfo from '@react-native-community/netinfo';
 
 type HomePageNavigationProp = StackNavigationProp<RootStackParamList, 'HomePage'>;
 
@@ -25,6 +29,9 @@ const HomePage: React.FC = () => {
     const [userName, setUserName] = useState<string | null>(null);
     const [threads, setThreads] = useState<any[]>([]);
     const [isThreadLoading, setIsThreadLoading] = useState(false);
+    const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+    const [feedbackEmail, setFeedbackEmail] = useState('');
+    const [feedbackText, setFeedbackText] = useState('');
 
 
     useEffect(() => {
@@ -39,6 +46,11 @@ const HomePage: React.FC = () => {
 
     const fetchUserThreads = async () => {
         try {
+            const isConnected = await checkConnectionStatus();
+            if (!isConnected) {
+                Alert.alert("Error", "Please check your network and try again.");
+                return;
+            }
             const accessToken = await AsyncStorage.getItem("accessToken");
             const response = await fetch('http://172.105.105.81:8000/api/get_user_threads/', {
                 method: "GET",
@@ -65,6 +77,10 @@ const HomePage: React.FC = () => {
             setIsThreadLoading(false);
         }
     };
+    const checkConnectionStatus = async () => {
+        const state = await NetInfo.fetch();
+        return state.isConnected;
+    };
 
     const handleThreadSelect = (threadId: string) => {
         // Navigate to VoiceAssistant with the selected thread
@@ -73,7 +89,13 @@ const HomePage: React.FC = () => {
 
     const checkIfLoggedIn = async () => {
         const accessToken = await AsyncStorage.getItem("accessToken");
-    
+        const isConnected = await checkConnectionStatus();
+
+        if (!isConnected) {
+            Alert.alert("Error", "No network available, some features may not work.");
+            return;
+        }
+
         if (accessToken) {
             setUserName("authenticated"); // Just a placeholder value to indicate login
         } else {
@@ -107,6 +129,12 @@ const HomePage: React.FC = () => {
             return;
         }
         setLoading(true);
+
+        const isConnected = await checkConnectionStatus();
+            if (!isConnected) {
+                Alert.alert("Error", "Please check your network and try again.");
+                return;
+            }
 
         try {
             const response = await fetch('http://172.105.105.81:8000/api/login/', {
@@ -142,6 +170,12 @@ const HomePage: React.FC = () => {
         }
         setLoading(true);
 
+        const isConnected = await checkConnectionStatus();
+            if (!isConnected) {
+                Alert.alert("Error", "Please check your network and try again.");
+                return;
+            }
+
         try {
             const response = await fetch('http://172.105.105.81:8000/api/register/', {
                 method: "POST",
@@ -167,8 +201,58 @@ const HomePage: React.FC = () => {
         }
     };
 
+    const handleFeedbackSubmit = async () => {
+        if (!feedbackText.trim()) {
+
+            /*Toast.show({
+                type: 'error',
+                text1: 'Please enter your feedback.',
+              });*/
+          alert("Please enter your feedback.");
+          return;
+        }
+
+        const isConnected = await checkConnectionStatus();
+            if (!isConnected) {
+                Alert.alert("Error", "Please check your network and try again.");
+                return;
+        }
+      
+        try {
+            const accessToken = await AsyncStorage.getItem("accessToken");
+            const response = await fetch('http://172.105.105.81:8000/api/feedback/', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              "Authorization": `Bearer ${accessToken}`
+            },
+            body: JSON.stringify({
+              "message": feedbackText,
+              "email": feedbackEmail || "",
+            }),
+          });
+
+          if (response.status === 401) {
+            await refreshAccessToken();
+            return fetchUserThreads(); // Retry request
+        }
+      
+          if (response.ok) {
+            alert("Thank you for your feedback!");
+            setFeedbackEmail('');
+            setFeedbackText('');
+          } else {
+            alert("Please enter a valid email.");
+          }
+        } catch (error) {
+          console.error("Feedback submit error:", error);
+          alert("An error occurred. Please try again later.");
+        }
+    };
+
     return (
         <SafeAreaView style={styles.container}>
+            
             <ScrollView contentContainerStyle={styles.scrollView} refreshControl={
                     <RefreshControl
                         refreshing={isThreadLoading}
@@ -179,16 +263,22 @@ const HomePage: React.FC = () => {
                 <TouchableOpacity style={styles.signOutButton} onPress={handleLogout}>
                 <Ionicons name="log-out-outline" size={24} color="red" />
                 </TouchableOpacity>
+                
+
+                <View style={styles.topLeftButtons}>
+                    <TouchableOpacity style={styles.headerButton} onPress={() => setShowFeedbackModal(true)}>
+                <Text style={styles.headerButtonText}>Help Us Improve</Text>
+                    </TouchableOpacity>
+                </View>
+
                 <Text style={styles.title}>AI First Aid Assistant</Text>
                 <Text style={styles.subtitle}>How can we help you today?</Text>
-
-                
                 <TouchableOpacity
                     style={styles.button}
                     onPress={() => router.push('/VoiceAssistant')}
                 >
                     <Ionicons name="mic" size={24} color="#007AFF"/>
-                    <Text style={styles.buttonText}>Voice Assistant</Text>
+                    <Text style={styles.buttonText}>AI Assistant</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -262,6 +352,64 @@ const HomePage: React.FC = () => {
                     </View>
                 </View>
             </Modal>
+
+            <Modal visible={showFeedbackModal} animationType="slide" transparent>
+                <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+                <View style={styles.modalContainer}>
+                    <View style={styles.modalContent}>
+
+                    
+                    <Text style={styles.modalTitle}>Share Your Feedback</Text>
+                    <Text style={styles.donationText}>Tell us how we can make it better!</Text>
+
+                    {/* Feedback Section */}
+                    <TextInput
+                        style={styles.input}
+                        placeholder="Email (optional)"
+                        value={feedbackEmail}
+                        onChangeText={setFeedbackEmail}
+                        keyboardType="email-address"
+                        placeholderTextColor="#888"
+                    />
+                    <TextInput
+                        style={[styles.input, { height: 100 }]}
+                        placeholder="Feedback"
+                        value={feedbackText}
+                        onChangeText={setFeedbackText}
+                        multiline
+                        placeholderTextColor="#888"
+                    />
+
+                    {/* Submit Button */}
+                    <TouchableOpacity style={styles.authButton} onPress={handleFeedbackSubmit}>
+                        <Text style={styles.authButtonText}>Submit Feedback</Text>
+                    </TouchableOpacity>
+
+                    <Text style={styles.donationText}></Text>
+                    <Text style={styles.donationText}>___________________</Text>
+                    <Text style={styles.donationText}></Text>
+                    <Text style={styles.modalTitle}>Make a Donation</Text>
+
+                    {/* Donation Section */}
+                    <View style={styles.donationSection}>
+                        <Text style={styles.donationText}>Your contribution means a lot to us!</Text>
+                        <TouchableOpacity onPress={() => Linking.openURL('https://gofund.me/77e62180')} style={styles.donationButton}>
+                            <Text style={styles.donationButtonText}>Donate Now</Text>
+                            
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Close Button */}
+                    <TouchableOpacity onPress={() => setShowFeedbackModal(false)}>
+                        <Text style={styles.switchText}>Close</Text>
+                    </TouchableOpacity>
+
+                    
+                    </View>
+                </View>
+                </TouchableWithoutFeedback>
+            </Modal>
+
         </SafeAreaView>
     );
 };
@@ -277,6 +425,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         paddingVertical: moderateScale(30),
+        paddingTop: moderateScale(50),
     },
     title: {
         fontSize: scale(28),
@@ -400,6 +549,54 @@ const styles = StyleSheet.create({
     threadPreview: {
         color: '#666',
     },
+    topLeftButtons: {
+        position: 'absolute',
+        top: moderateScale(20),
+        left: moderateScale(20),
+        zIndex: 10,
+    },
+    
+    headerButton: {
+        backgroundColor: '#fff',
+        paddingVertical: moderateScale(8),
+        paddingHorizontal: moderateScale(12),
+        borderRadius: 8,
+        marginBottom: moderateScale(10),
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 3,
+    },
+    
+    headerButtonText: {
+        fontSize: scale(14),
+        fontWeight: '600',
+        color: '#007AFF',
+    },
+    donationSection: {
+        marginBottom: 20,
+        textAlign: "center",
+      },
+      donationText: {
+        fontSize: 16,
+        color: "#555",
+        marginBottom: 10,
+      },
+      donationButton: {
+        backgroundColor: "#007BFF",
+        paddingVertical: 12,
+        paddingHorizontal: 30,
+        borderRadius: 8,
+        marginTop: 10,
+        alignItems: "center",
+      },
+      donationButtonText: {
+        color: "#fff",
+        fontSize: 16,
+        fontWeight: "bold",
+      },
+      
 });
 
 export default HomePage;
