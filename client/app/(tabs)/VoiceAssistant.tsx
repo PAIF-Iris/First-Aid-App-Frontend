@@ -39,7 +39,7 @@ export const refreshAccessToken = async () => {
     }
 
     const refreshToken = await AsyncStorage.getItem("refreshToken");
-    const response = await fetch("http://172.105.105.81:8000/api/token/refresh/", {
+    const response = await fetch("http://172.105.105.81/api/token/refresh/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refresh: refreshToken }),
@@ -174,7 +174,7 @@ const VoiceAssistant: React.FC = () => {
                 return;
             }
             const accessToken = await AsyncStorage.getItem("accessToken");
-            const response = await fetch(`http://172.105.105.81:8000/api/get_thread_messages/`, {
+            const response = await fetch(`http://172.105.105.81/api/get_thread_messages/`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -220,7 +220,7 @@ const VoiceAssistant: React.FC = () => {
             }
 
             const accessToken = await AsyncStorage.getItem("accessToken");
-            const response = await fetch("http://172.105.105.81:8000/api/start_new_conversation/", {
+            const response = await fetch("http://172.105.105.81/api/start_new_conversation/", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -271,7 +271,7 @@ const VoiceAssistant: React.FC = () => {
             const sendMessageRequest = async (retry: boolean = true) => {
                 let accessToken = await AsyncStorage.getItem("accessToken");
         
-                const response = await fetch("http://172.105.105.81:8000/api/chat/", {
+                const response = await fetch("http://172.105.105.81/api/chat/", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
@@ -486,7 +486,7 @@ const VoiceAssistant: React.FC = () => {
         );
       };
     
-    const stopRecording = async () => {
+      const stopRecording = async () => {
         setIsRecording(false);
         if (isWaitingForResponse) {
             return;
@@ -500,7 +500,6 @@ const VoiceAssistant: React.FC = () => {
             intervalRef.current = null;
         }
         if (!audioRecordingRef.current) return;
-
         try {
             await audioRecordingRef.current.stopAndUnloadAsync();
             const uri = audioRecordingRef.current.getURI();
@@ -515,7 +514,7 @@ const VoiceAssistant: React.FC = () => {
             setMessages((prevMessages) => [...prevMessages, loadingMessage]);
 
             const accessToken = await AsyncStorage.getItem("accessToken");
-            const uploadUrl = "http://172.105.105.81:8000/api/chat/";
+            const uploadUrl = "http://172.105.105.81/api/chat/";
             const formData = new FormData();
 
             formData.append("audio", {
@@ -534,7 +533,7 @@ const VoiceAssistant: React.FC = () => {
             const sendAudioRequest = async (retry: boolean = true) => {
                 let accessToken = await AsyncStorage.getItem("accessToken");
     
-                const response = await fetch("http://172.105.105.81:8000/api/chat/", {
+                const response = await fetch("http://172.105.105.81/api/chat/", {
                     method: "POST",
                     headers: {
                         "Authorization": `Bearer ${accessToken}`,
@@ -554,7 +553,7 @@ const VoiceAssistant: React.FC = () => {
             const data = await response.json();
             const botMessage = data.answer || "Sorry, I did not understand that.";
     
-        
+            
             setMessages((prevMessages) =>
                 prevMessages.map((msg) =>
                     msg.id === 'loading'
@@ -624,6 +623,8 @@ const VoiceAssistant: React.FC = () => {
                                 );
                             })}
                         </ScrollView>
+
+                        <Text style={styles.subtitle}>AI make mistakes. Use responses with caution.</Text>
     
                         <View style={styles.inputContainer}>
                             <TouchableOpacity onPress={toggleInputMode} style={styles.modeToggle}>
@@ -705,207 +706,14 @@ const styles = StyleSheet.create({
         color: '#555',
         fontSize: 14,
         fontStyle: 'italic',
-    }
+    },
+    subtitle: {
+        fontSize: 14,
+        color: '#666',
+        marginBottom: 10,
+        textAlign: 'center',
+    },
 });
 
 
 export default VoiceAssistant;
-
-
-//no speech functions
-/*import React, { useState, useRef, useEffect } from 'react';
-import { 
-    View, 
-    Text, 
-    StyleSheet, 
-    SafeAreaView, 
-    TextInput, 
-    TouchableOpacity, 
-    ScrollView, 
-    KeyboardAvoidingView, 
-    Platform, 
-    Keyboard, 
-    TouchableWithoutFeedback,
-    LayoutAnimation
-} from 'react-native';
-
-const VoiceAssistant: React.FC = () => {
-    const [messages, setMessages] = useState<{ text: string; sender: 'user' | 'bot' }[]>([
-        { text: 'How can I help?', sender: 'bot' }
-    ]);
-    const [input, setInput] = useState('');
-    const scrollViewRef = useRef<ScrollView>(null);
-
-    useEffect(() => {
-        if (scrollViewRef.current) {
-            scrollViewRef.current.scrollToEnd({ animated: false });
-        }
-    }, [messages]);
-
-    useEffect(() => {
-        const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
-            LayoutAnimation.configureNext(LayoutAnimation.Presets.linear);
-            if (scrollViewRef.current) {
-                scrollViewRef.current.scrollToEnd({ animated: true }); 
-            }
-        });
-
-        const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
-            LayoutAnimation.configureNext(LayoutAnimation.Presets.linear); 
-        });
-
-        return () => {
-            keyboardDidShowListener.remove();
-            keyboardDidHideListener.remove();
-        };
-    }, []);
-
-    const handleSend = async () => {
-        if (input.trim()) {
-            const newMessage = { text: input, sender: 'user' as const };
-            setMessages((prevMessages) => [...prevMessages, newMessage]);
-            setInput('');
-
-            try {
-                const response = await fetch('http://192.168.2.68:8000/api/chat/', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ message: input })
-                });
-
-                const data = await response.json();
-                const botMessage = data.answer || 'Sorry, I did not understand that.';
-
-                setMessages((prevMessages) => [
-                    ...prevMessages, 
-                    { text: botMessage, sender: 'bot' as const } 
-                ]);
-            } catch (error) {
-                console.error('Error communicating with backend API:', error);
-                setMessages((prevMessages) => [
-                    ...prevMessages, 
-                    { text: 'Sorry, something went wrong.', sender: 'bot' as const }
-                ]);
-            }
-        }
-    };
-
-    return (
-        <SafeAreaView style={styles.container}>
-            <KeyboardAvoidingView 
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
-                style={styles.flexContainer}
-            >
-                <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-                    <View style={styles.flexContainer}>
-                    
-                    <ScrollView 
-                            ref={scrollViewRef} 
-                            style={styles.messagesContainer} 
-                            contentContainerStyle={{ paddingBottom: 70 }}
-                            onContentSizeChange={() => {
-                                if (scrollViewRef.current) {
-                                    scrollViewRef.current.scrollToEnd({ animated: false });
-                                }
-                            }}
-                        >
-                            {messages.map((msg, index) => (
-                                <View 
-                                    key={index}
-                                    style={[
-                                        styles.messageBubble, 
-                                        msg.sender === 'user' ? styles.userBubble : styles.botBubble
-                                    ]}
-                                >
-                                    <Text style={styles.messageText}>{msg.text}</Text>
-                                </View>
-                            ))}
-                        </ScrollView>
-
-                        <View style={styles.inputContainer}>
-                            <TextInput
-                                style={styles.input}
-                                value={input}
-                                onChangeText={setInput}
-                                placeholder="Type your message..."
-                                placeholderTextColor="#777"
-                            />
-                            <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
-                                <Text style={styles.sendButtonText}>Send</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </TouchableWithoutFeedback>
-            </KeyboardAvoidingView>
-        </SafeAreaView>
-    );
-};
-
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#F8F8F8',
-    },
-    flexContainer: {
-        flex: 1,
-    },
-    messagesContainer: {
-        flex: 1,
-        padding: 10,
-    },
-    messageBubble: {
-        padding: 12,
-        borderRadius: 10,
-        marginVertical: 5,
-        maxWidth: '80%',
-    },
-    userBubble: {
-        backgroundColor: '#DCF8C6',
-        alignSelf: 'flex-end',
-    },
-    botBubble: {
-        backgroundColor: '#E2E2E2',
-        alignSelf: 'flex-start',
-    },
-    messageText: {
-        fontSize: 16,
-    },
-    inputContainer: {
-        position: 'absolute', 
-        bottom: 0, 
-        left: 0, 
-        right: 0, 
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 10,
-        borderTopWidth: 1,
-        borderColor: '#E2E2E2',
-        backgroundColor: '#FFF',
-    },
-    input: {
-        flex: 1,
-        borderColor: '#E2E2E2',
-        borderWidth: 1,
-        borderRadius: 25,
-        paddingHorizontal: 15,
-        paddingVertical: 10,
-        marginRight: 10,
-        fontSize: 16,
-        color: '#000',
-    },
-    sendButton: {
-        backgroundColor: '#007AFF',
-        borderRadius: 25,
-        paddingVertical: 10,
-        paddingHorizontal: 20,
-    },
-    sendButtonText: {
-        color: '#FFFFFF',
-        fontSize: 16,
-    },
-});
-
-export default VoiceAssistant;
-*/

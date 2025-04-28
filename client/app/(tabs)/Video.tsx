@@ -1,274 +1,171 @@
-//video is from YouTube
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Button, ActivityIndicator, Dimensions } from 'react-native';
+import * as FileSystem from 'expo-file-system';
+import { VideoView, useVideoPlayer} from 'expo-video';  // 👉 Import Video from expo-video
+import { scale, verticalScale, moderateScale } from 'react-native-size-matters';
 
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Button } from 'react-native';
-import { WebView } from 'react-native-webview';
-import * as FileSystem from "expo-file-system";
-
-const Video = () => {
-    const [videoUrl, setVideoUrl] = useState<string | null>(null);
-
-    // List of video sections with YouTube links
-    const videoSections = [
-        { id: 1, title: 'CPR', description: 'Learn how to perform CPR in emergency situations.', videoUrl: 'https://www.youtube.com/watch?v=BQNNOh8c8ks' },
-        { id: 2, title: 'Choking', description: 'Steps to help someone who is choking.', videoUrl: 'https://www.youtube.com/embed/oHg5SJYRHA0' },
-        { id: 3, title: 'Burn', description: 'First aid for burns and scalds.', videoUrl: 'https://www.youtube.com/embed/kJQP7kiw5Fk' },
-        { id: 4, title: 'Bleeding', description: 'How to stop severe bleeding.', videoUrl: 'https://www.youtube.com/embed/YbJOTdZBX1g' },
-        { id: 5, title: 'Sprain', description: 'Treating sprains and strains.', videoUrl: 'https://www.youtube.com/embed/dQw4w9WgXcQ' },
-    ];
-
-    // Function to handle section press
-    const handleSectionPress = (videoUrl: string) => {
-        setVideoUrl(videoUrl); // Set the URL to show the video in WebView
-    };
-
-    // Function to close the video modal
-    const handleCloseVideo = () => {
-        setVideoUrl(null); // Clear the video URL to close the modal
-    };
-
-    return (
-        <View style={styles.container}>
-            <Text style={styles.header}>First Aid Videos</Text>
-            <ScrollView contentContainerStyle={styles.scrollContainer}>
-                {videoSections.map((section) => (
-                    <TouchableOpacity
-                        key={section.id}
-                        style={styles.sectionCard}
-                        onPress={() => handleSectionPress(section.videoUrl)}
-                    >
-                        <Text style={styles.sectionTitle}>{section.title}</Text>
-                        <Text style={styles.sectionDescription}>{section.description}</Text>
-                    </TouchableOpacity>
-                ))}
-            </ScrollView>
-
-            <Modal
-                visible={!!videoUrl} // Only visible if videoUrl is set
-                transparent={true}
-                animationType="fade"
-                onRequestClose={handleCloseVideo}
-            >
-                <View style={styles.modalBackground}>
-                    <View style={styles.modalContainer}>
-                        <WebView
-                            source={{ uri: videoUrl || '' }}
-                            style={styles.webview}
-                            javaScriptEnabled={true}
-                            domStorageEnabled={true}
-                        />
-                        <Button title="Close" onPress={handleCloseVideo} />
-                    </View>
-                </View>
-            </Modal>
-        </View>
-    );
+type VideoSection = {
+  id: number;
+  title: string;
+  description: string;
+  remoteUrl: string;
+  localUri?: string;
 };
 
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#F8F8F8',
-        padding: 16,
+const Videos = () => {
+  const [videoSections, setVideoSections] = useState<VideoSection[]>([
+    {
+      id: 1,
+      title: 'CPR',
+      description: 'CPR on cardiac arrest patients.',
+      remoteUrl: 'http://172.105.105.81/videos/AdultCPR.mp4',
     },
-    header: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        color: '#333',
-        marginBottom: 20,
+    {
+      id: 2,
+      title: 'Choking',
+      description: 'Perform J-thrust on youth and adults.',
+      remoteUrl: 'http://172.105.105.81/videos/Choking.mp4',
     },
-    scrollContainer: {
-        paddingBottom: 20,
+    {
+      id: 3,
+      title: 'Self-Choking',
+      description: 'Save yourself when you are alone and choking.',
+      remoteUrl: 'http://172.105.105.81/videos/SelfChoking.mp4',
     },
-    sectionCard: {
-        backgroundColor: '#FFF',
-        borderRadius: 10,
-        padding: 16,
-        marginBottom: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
-        elevation: 3,
-    },
-    sectionTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        color: '#007AFF',
-        marginBottom: 8,
-    },
-    sectionDescription: {
-        fontSize: 14,
-        color: '#666',
-    },
-    modalBackground: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    },
-    modalContainer: {
-        width: '90%',
-        height: '80%',
-        backgroundColor: '#FFF',
-        borderRadius: 10,
-        overflow: 'hidden',
-        justifyContent: 'space-between',
-    },
-    webview: {
-        flex: 1,
-    },
-});
+  ]);
 
-export default Video;
+  const [selectedVideoUri, setSelectedVideoUri] = useState<string | null>(null);
+  const [isDownloading, setIsDownloading] = useState<boolean>(false);
 
-/*
-//Can't use react-native-fs to test on Expo Go
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Button } from 'react-native';
-import Video from 'react-native-video'; // Used to play the video
-import RNFS from 'react-native-fs'; // For accessing the local file system
-import { Asset } from 'expo-asset';
+  // Download all videos on mount
+  useEffect(() => {
+    const downloadAllVideos = async () => {
+      setIsDownloading(true);
+      const updatedSections = await Promise.all(
+        videoSections.map(async (section) => {
+          const fileUri = `${FileSystem.documentDirectory}${section.title.replace(/\s/g, '')}.mp4`;
+          const fileInfo = await FileSystem.getInfoAsync(fileUri);
 
-interface VideoPlayerProps {
-    videoUri: string;
-    onClose: () => void;
-  }
-  
-  const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoUri, onClose }) => {
-    return (
-    <Modal
-      visible={true}
-      transparent={true}
-      animationType="slide"
-      onRequestClose={onClose}
-    >
-      <View style={styles.modalContainer}>
-        <Video
-          source={{ uri: videoUri }}
-          style={styles.videoPlayer}
-          controls={true} // Add full controls (pause/play, etc.)
-          resizeMode="contain"
-        />
-        <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-          <Text style={styles.closeButtonText}>Close</Text>
-        </TouchableOpacity>
-      </View>
-    </Modal>
-  );
-};
+          if (!fileInfo.exists) {
+            try {
+              await FileSystem.downloadAsync(section.remoteUrl, fileUri);
+              console.log(`Downloaded ${section.title}`);
+            } catch (err) {
+              console.error(`Failed to download ${section.title}:`, err);
+              return section; // return without localUri
+            }
+          }
 
-const VideoView = () => {
-  // List of video sections with titles and associated local video filenames
-  const videoSections = [
-    { id: 1, title: 'CPR', videoFileName: 'CPR.mp4', description: 'Learn how to perform CPR in emergency situations.' },
-    { id: 2, title: 'Choking', videoFileName: 'Choking.mp4', description: 'Steps to help someone who is choking.' },
-    { id: 3, title: 'Burn', videoFileName: 'Burn.mp4', description: 'First aid for burns and scalds.' },
-    { id: 4, title: 'Bleeding', videoFileName: 'Bleeding.mp4', description: 'How to stop severe bleeding.' },
-    { id: 5, title: 'Sprain', videoFileName: 'Sprain.mp4', description: 'Treating sprains and strains.' },
-  ];
+          return { ...section, localUri: fileUri };
+        })
+      );
+      setVideoSections(updatedSections);
+      setIsDownloading(false);
+    };
 
-  const [isVideoVisible, setIsVideoVisible] = useState(false);
-  const [videoUri, setVideoUri] = useState('');
+    downloadAllVideos();
+  }, []);
 
-  // Function to handle section press and open video player
-  const handleSectionPress = (videoFileName: string) => {
-    // Construct the local video path from the app bundle
-    const localVideoUri = getVideoUri(videoFileName);
-    setVideoUri(localVideoUri);
-    setIsVideoVisible(true);
+  const handleSectionPress = (uri: string | undefined) => {
+    if (uri) setSelectedVideoUri(uri);
   };
 
-  const getVideoUri = (videoFileName: string) => {
-    const videoAsset = Asset.fromModule(require(`../../assets/videos/${videoFileName}`));
-    return videoAsset.uri;
+  const handleCloseVideo = () => {
+    setSelectedVideoUri(null);
   };
 
-  // Function to close the video player
-  const closeVideo = () => {
-    setIsVideoVisible(false);
-  };
+  const player = useVideoPlayer(selectedVideoUri, (player) => {
+    player.loop = true;
+    player.play();
+  });
 
   return (
     <View style={styles.container}>
       <Text style={styles.header}>First Aid Videos</Text>
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        {videoSections.map((section) => (
-          <TouchableOpacity
-            key={section.id}
-            style={styles.sectionCard}
-            onPress={() => handleSectionPress(section.videoFileName)}
-          >
-            <Text style={styles.sectionTitle}>{section.title}</Text>
-            <Text style={styles.sectionDescription}>{section.description}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      <Text style={styles.subtitle}>Disclaimer: These videos are for guidance purposes only and do not replace professional advice.</Text>
 
-      {isVideoVisible && <VideoPlayer videoUri={videoUri} onClose={closeVideo} />}
+      {isDownloading ? (
+        <ActivityIndicator size="large" color="#007AFF" style={{ marginTop: 30 }} />
+      ) : (
+        <ScrollView contentContainerStyle={styles.scrollContainer}>
+          {videoSections.map((section) => (
+            <TouchableOpacity
+              key={section.id}
+              style={styles.sectionCard}
+              onPress={() => handleSectionPress(section.localUri)}
+              disabled={!section.localUri}
+            >
+              <Text style={styles.sectionTitle}>{section.title}</Text>
+              <Text style={styles.sectionDescription}>{section.description}</Text>
+              {!section.localUri && <Text style={styles.downloadingText}>Downloading...</Text>}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
+      {selectedVideoUri && (
+        <View style={styles.fullScreenContainer}>
+            {selectedVideoUri && (
+              <VideoView style={styles.video} player={player} allowsFullscreen allowsPictureInPicture />
+            )}
+            <Button title="Close" onPress={handleCloseVideo} />
+          </View>
+      )}
     </View>
   );
 };
-
+const { width, height } = Dimensions.get('window');
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F8F8F8',
-    padding: 16,
-  },
-  header: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 20,
-  },
-  scrollContainer: {
-    paddingBottom: 20,
-  },
+  container: { flex: 1, backgroundColor: '#F8F8F8', padding: moderateScale(16) },
+  header: { fontSize: scale(24), fontWeight: 'bold', color: '#333', marginBottom: verticalScale(10) },
+  scrollContainer: { paddingBottom: verticalScale(20) },
   sectionCard: {
     backgroundColor: '#FFF',
-    borderRadius: 10,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: moderateScale(10),
+    padding: moderateScale(16),
+    marginBottom: verticalScale(12),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: moderateScale(4),
+    elevation: moderateScale(3),
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: scale(18),
     fontWeight: 'bold',
     color: '#007AFF',
-    marginBottom: 8,
+    marginBottom: verticalScale(8),
   },
   sectionDescription: {
-    fontSize: 14,
+    fontSize: scale(14),
     color: '#666',
   },
-  modalContainer: {
+  downloadingText: {
+    fontSize: scale(12),
+    color: '#999',
+    marginTop: verticalScale(5),
+  },
+  video: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  subtitle: {
+    fontSize: scale(10),
+    color: '#666',
+    marginBottom: verticalScale(30),
+    textAlign: 'left',
+  },
+  fullScreenContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-  },
-  videoPlayer: {
-    width: '100%',
-    height: '80%',
-  },
-  closeButton: {
+    width: width-10,
+    height: height-10,
     position: 'absolute',
-    top: 20,
-    right: 20,
-    backgroundColor: 'red',
-    padding: 10,
-    borderRadius: 5,
-  },
-  closeButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)', // Background overlay to darken behind video
+    top: 5,
+    left: 5
   },
 });
 
-export default VideoView;
-*/
+export default Videos;

@@ -52,7 +52,7 @@ const HomePage: React.FC = () => {
                 return;
             }
             const accessToken = await AsyncStorage.getItem("accessToken");
-            const response = await fetch('http://172.105.105.81:8000/api/get_user_threads/', {
+            const response = await fetch('http://172.105.105.81/api/get_user_threads/', {
                 method: "GET",
                 headers: { 
                     "Content-Type": "application/json",
@@ -137,7 +137,7 @@ const HomePage: React.FC = () => {
             }
 
         try {
-            const response = await fetch('http://172.105.105.81:8000/api/login/', {
+            const response = await fetch('http://172.105.105.81/api/login/', {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ username, password }),
@@ -177,7 +177,7 @@ const HomePage: React.FC = () => {
             }
 
         try {
-            const response = await fetch('http://172.105.105.81:8000/api/register/', {
+            const response = await fetch('http://172.105.105.81/api/register/', {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ username, password, name, age }),
@@ -220,7 +220,7 @@ const HomePage: React.FC = () => {
       
         try {
             const accessToken = await AsyncStorage.getItem("accessToken");
-            const response = await fetch('http://172.105.105.81:8000/api/feedback/', {
+            const response = await fetch('http://172.105.105.81/api/feedback/', {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -434,8 +434,6 @@ const styles = StyleSheet.create({
         color: '#333',
         marginBottom: moderateScale(10),
         textAlign: 'center',
-
-        
     },
     subtitle: {
         fontSize: 18,
