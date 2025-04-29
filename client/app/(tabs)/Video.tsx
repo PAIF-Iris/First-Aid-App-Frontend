@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Modal, Button, Ac
 import * as FileSystem from 'expo-file-system';
 import { VideoView, useVideoPlayer} from 'expo-video';  // 👉 Import Video from expo-video
 import { scale, verticalScale, moderateScale } from 'react-native-size-matters';
+import Feather from '@expo/vector-icons/Feather';
 
 type VideoSection = {
   id: number;
@@ -29,7 +30,7 @@ const Videos = () => {
     {
       id: 3,
       title: 'Self-Choking',
-      description: 'Save yourself when you are alone and choking.',
+      description: 'When you are choking and alone.',
       remoteUrl: 'http://172.105.105.81/videos/SelfChoking.mp4',
     },
   ]);
@@ -77,6 +78,8 @@ const Videos = () => {
   const player = useVideoPlayer(selectedVideoUri, (player) => {
     player.loop = true;
     player.play();
+  
+const { width, height } = Dimensions.get('window');
   });
 
   return (
@@ -85,7 +88,10 @@ const Videos = () => {
       <Text style={styles.subtitle}>Disclaimer: These videos are for guidance purposes only and do not replace professional advice.</Text>
 
       {isDownloading ? (
-        <ActivityIndicator size="large" color="#007AFF" style={{ marginTop: 30 }} />
+        <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#007AFF" />
+        <Text style={styles.loadingText}>Downloading videos, please wait...</Text>
+      </View>
       ) : (
         <ScrollView contentContainerStyle={styles.scrollContainer}>
           {videoSections.map((section) => (
@@ -107,7 +113,9 @@ const Videos = () => {
             {selectedVideoUri && (
               <VideoView style={styles.video} player={player} allowsFullscreen allowsPictureInPicture />
             )}
-            <Button title="Close" onPress={handleCloseVideo} />
+            <TouchableOpacity onPress={handleCloseVideo} style={styles.closeButton}>
+              <Feather name="x-square" size={moderateScale(40)} color="black" />
+            </TouchableOpacity>
           </View>
       )}
     </View>
@@ -116,13 +124,13 @@ const Videos = () => {
 const { width, height } = Dimensions.get('window');
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8F8F8', padding: moderateScale(16) },
-  header: { fontSize: scale(24), fontWeight: 'bold', color: '#333', marginBottom: verticalScale(10) },
-  scrollContainer: { paddingBottom: verticalScale(20) },
+  header: { fontSize: moderateScale(24), fontWeight: 'bold', color: '#333', marginBottom: moderateScale(10) },
+  scrollContainer: { paddingBottom: moderateScale(20) },
   sectionCard: {
     backgroundColor: '#FFF',
     borderRadius: moderateScale(10),
     padding: moderateScale(16),
-    marginBottom: verticalScale(12),
+    marginBottom: moderateScale(12),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -130,19 +138,19 @@ const styles = StyleSheet.create({
     elevation: moderateScale(3),
   },
   sectionTitle: {
-    fontSize: scale(18),
+    fontSize: moderateScale(18),
     fontWeight: 'bold',
     color: '#007AFF',
-    marginBottom: verticalScale(8),
+    marginBottom: moderateScale(8),
   },
   sectionDescription: {
-    fontSize: scale(14),
+    fontSize: moderateScale(14),
     color: '#666',
   },
   downloadingText: {
-    fontSize: scale(12),
+    fontSize: moderateScale(12),
     color: '#999',
-    marginTop: verticalScale(5),
+    marginTop: moderateScale(5),
   },
   video: {
     flex: 1,
@@ -159,12 +167,29 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    width: width-10,
-    height: height-10,
+    width: width-moderateScale(10),
+    height: height-moderateScale(10),
     position: 'absolute',
     backgroundColor: 'rgba(0, 0, 0, 0.7)', // Background overlay to darken behind video
-    top: 5,
-    left: 5
+    top: moderateScale(5),
+    left: moderateScale(5)
+  },
+  closeButton: {
+    position: 'absolute',
+    top: height/4, // or however high you want
+    right: width/50,
+    zIndex: 10, // make sure it’s on top,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: moderateScale(20),
+  },
+  loadingText: {
+    fontSize: moderateScale(16),
+    color: '#555',
+    marginTop: moderateScale(10),
   },
 });
 

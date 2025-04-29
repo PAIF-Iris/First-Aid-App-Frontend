@@ -14,7 +14,8 @@ import {
     LayoutAnimation,
     Linking,
     ActivityIndicator,
-    Alert
+    Alert,
+    Dimensions
 } from 'react-native';
 import { Audio } from 'expo-av';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -27,7 +28,7 @@ import { RouteProp } from '@react-navigation/native';
 import { RootStackParamList } from '../../types';
 import { StackNavigationProp } from '@react-navigation/stack';
 import NetInfo from '@react-native-community/netinfo';
-
+import { scale, verticalScale, moderateScale } from 'react-native-size-matters';
 
 type VoiceAssistantRouteProp = RouteProp<RootStackParamList, 'VoiceAssistant'>;
 
@@ -454,51 +455,72 @@ const VoiceAssistant: React.FC = () => {
     const toggleInputMode = () => {
         setIsVoiceMode(!isVoiceMode);
     };
-    
+    const { width, height } = Dimensions.get('window');
     const calculateBubbleWidth = (duration: number) => {
-        const maxWidth = 270;
-        const minWidth = 70; 
-        const maxDuration = 60; 
+        const maxWidth = width/4*2.8;
+        const minWidth = width/8; 
+        const maxDuration = 30; 
     
         return Math.min(maxWidth, minWidth + (duration / maxDuration) * (maxWidth - minWidth));
     };
 
 
     const startRecording = async () => {
+        if (isWaitingForResponse) {
+            return;
+        }
+        let hasPermission = !!webAudioPermissionsRef.current;
+
+        if (!hasPermission) {
+        // 2. If no permission yet, request permission
+        const permissionResponse = await Audio.requestPermissionsAsync();
+        hasPermission = permissionResponse.status === "granted";
+        }
+
+        if (!hasPermission) {
+            Alert.alert(
+                "Microphone Access Required",
+                "Please enable microphone access in your device settings.",
+                [{ text: "OK" }]
+            );
+            return;
+        }
+
         setIsRecording(true);
         setDuration(1); // Reset duration
         durationRef.current = 1; // Reset ref
-        
-        intervalRef.current = setInterval(() => {
-            durationRef.current += 1;
-            setDuration(durationRef.current);
-    
-            // Stop recording after 60 seconds
-            if (durationRef.current >= 60) {
-                stopRecording();
-            }
-        }, 1000);
         
         await recordSpeech(
           audioRecordingRef,
           setIsRecording,
           !!webAudioPermissionsRef.current
         );
-      };
-    
-      const stopRecording = async () => {
-        setIsRecording(false);
-        if (isWaitingForResponse) {
-            return;
-        }
 
-        setIsWaitingForResponse(true);
-    
-        setIsWaitingForResponse(true);
+        intervalRef.current = setInterval(() => {
+            durationRef.current += 1;
+            setDuration(durationRef.current);        
+            if (durationRef.current >= 30) {
+                
+                stopRecording();
+                return;
+            }    
+        }, 1000);
+      };
+
+
+      const stopRecording = async () => {
         if (intervalRef.current) {
             clearInterval(intervalRef.current);
             intervalRef.current = null;
         }
+        
+        setIsRecording(false);
+        if (isWaitingForResponse) {
+            return;
+        }
+        
+        setIsWaitingForResponse(true);
+
         if (!audioRecordingRef.current) return;
         try {
             await audioRecordingRef.current.stopAndUnloadAsync();
@@ -581,9 +603,8 @@ const VoiceAssistant: React.FC = () => {
             <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flexContainer}>
                 <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
                     <View style={styles.flexContainer}>
-                        <ScrollView ref={scrollViewRef} style={styles.messagesContainer} contentContainerStyle={{ paddingBottom: 70 }}>
+                        <ScrollView ref={scrollViewRef} style={styles.messagesContainer} contentContainerStyle={{ paddingBottom: moderateScale(70) }}>
                             {messages.map((msg, index) => {
-                                //const words = msg.text.split(/(\s+)/); // Split text while keeping spaces
                                 const messageText = msg.text || ""; // Ensure it's always a string
                                 const words = messageText.split(/(\s+)/);
     
@@ -628,16 +649,24 @@ const VoiceAssistant: React.FC = () => {
     
                         <View style={styles.inputContainer}>
                             <TouchableOpacity onPress={toggleInputMode} style={styles.modeToggle}>
-                                <MaterialIcons name={isVoiceMode ? 'keyboard' : 'mic'} size={24} color='#007AFF' />
+                                <MaterialIcons name={isVoiceMode ? 'keyboard' : 'mic'} size={moderateScale(30)} color='#007AFF' />
                             </TouchableOpacity>
                             {isVoiceMode ? (
                                 <TouchableOpacity
-                                    style={[styles.voiceInput, isRecording && styles.recording]}
-                                    onPressIn={startRecording}
-                                    onPressOut={stopRecording}
-                                >
-                                    <Text style={styles.voiceText}>Hold to Talk</Text>
-                                </TouchableOpacity>
+                                style={[styles.voiceInput, isRecording && styles.recording]}
+                                onPress={() => {
+                                  if (!isRecording && !isWaitingForResponse) {
+                                    startRecording();
+                                  } 
+                                  if (isRecording ){
+                                    stopRecording();
+                                  }
+                                }}
+                              >
+                                <Text style={styles.voiceText}>
+                                  {isRecording ? "Stop Recording" : "Start Recording"}
+                                </Text>
+                              </TouchableOpacity>
                             ) : (
                                 <TextInput
                                     style={styles.input}
@@ -663,30 +692,30 @@ const VoiceAssistant: React.FC = () => {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#F8F8F8' },
     flexContainer: { flex: 1 },
-    messagesContainer: { flex: 1, padding: 10 },
-    messageBubble: { padding: 12, borderRadius: 10, marginVertical: 5, maxWidth: '80%' },
+    messagesContainer: { flex: 1, padding: moderateScale(10) },
+    messageBubble: { padding: moderateScale(12), borderRadius: moderateScale(10), marginVertical: moderateScale(5), maxWidth: '80%' },
     userBubble: { backgroundColor: '#DCF8C6', alignSelf: 'flex-end' },
     botBubble: { backgroundColor: '#E2E2E2', alignSelf: 'flex-start' },
-    messageText: { fontSize: 16 },
-    inputContainer: { flexDirection: 'row', alignItems: 'center', padding: 10, borderTopWidth: 1, borderColor: '#E2E2E2', backgroundColor: '#FFF' },
-    input: { flex: 1, borderColor: '#E2E2E2', borderWidth: 1, borderRadius: 25, paddingHorizontal: 15, paddingVertical: 10, fontSize: 16, color: '#000' },
-    sendButton: { backgroundColor: '#007AFF', borderRadius: 25, paddingVertical: 10, paddingHorizontal: 20 },
+    messageText: { fontSize: moderateScale(16) },
+    inputContainer: { flexDirection: 'row', alignItems: 'center', padding: moderateScale(10), borderTopWidth: moderateScale(1), borderColor: '#E2E2E2', backgroundColor: '#FFF' },
+    input: { flex: 1, borderColor: '#E2E2E2', borderWidth: moderateScale(1), borderRadius: moderateScale(25), paddingHorizontal: moderateScale(15), paddingVertical: moderateScale(10), fontSize: moderateScale(16), color: '#000' },
+    sendButton: { backgroundColor: '#007AFF', borderRadius: moderateScale(25), paddingVertical: moderateScale(10), paddingHorizontal: moderateScale(20) },
     sendButtonText: { color: '#FFFFFF', fontSize: 16 },
     modeToggle: { marginRight: 10 },
-    voiceInput: { flex: 1, justifyContent: 'center', alignItems: 'center', borderColor: '#E2E2E2', borderWidth: 1, borderRadius: 25, padding: 10, backgroundColor: '#EEE' },
+    voiceInput: { flex: 1, justifyContent: 'center', alignItems: 'center', borderColor: '#E2E2E2', borderWidth: moderateScale(1), borderRadius: moderateScale(25), padding: moderateScale(10), backgroundColor: '#EEE' },
     recording: { backgroundColor: '#D9534F' },
     voiceText: { color: '#777' },
     voiceMessage: {
-        padding: 2,
-        borderRadius: 20,
+        padding: moderateScale(2),
+        borderRadius: moderateScale(20),
         backgroundColor: '#DCF8C6',
         alignSelf: 'flex-end',
         justifyContent: 'center',
         alignItems: 'flex-end',
-        height: 30,
+        height: moderateScale(30),
     },
     voiceMessageText: {
-        fontSize: 16,
+        fontSize: moderateScale(16),
         color: '#007AFF',
         textAlign: 'right'
     },
@@ -699,18 +728,18 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 10,
+        padding: moderateScale(10),
     },
     loadingText: {
-        marginLeft: 10,
+        marginLeft: moderateScale(10),
         color: '#555',
-        fontSize: 14,
+        fontSize: moderateScale(14),
         fontStyle: 'italic',
     },
     subtitle: {
-        fontSize: 14,
+        fontSize: moderateScale(14),
         color: '#666',
-        marginBottom: 10,
+        marginBottom: moderateScale(10),
         textAlign: 'center',
     },
 });

@@ -261,7 +261,7 @@ const HomePage: React.FC = () => {
                     />
                 }>
                 <TouchableOpacity style={styles.signOutButton} onPress={handleLogout}>
-                <Ionicons name="log-out-outline" size={24} color="red" />
+                <Ionicons name="log-out-outline" size={moderateScale(24)} color="red" />
                 </TouchableOpacity>
                 
 
@@ -277,19 +277,19 @@ const HomePage: React.FC = () => {
                     style={styles.button}
                     onPress={() => router.push('/VoiceAssistant')}
                 >
-                    <Ionicons name="mic" size={24} color="#007AFF"/>
+                    <Ionicons name="mic" size={moderateScale(24)} color="#007AFF"/>
                     <Text style={styles.buttonText}>AI Assistant</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                    style={styles.button}
+                    style={styles.button2}
                     onPress={() => router.push('/Video')}
                 >
-                    <Ionicons name="videocam" size={24} color="#007AFF" />
+                    <Ionicons name="videocam" size={moderateScale(24)} color="#007AFF" />
                     <Text style={styles.buttonText}>Videos</Text>
                 </TouchableOpacity>
 
-                <Text style={styles.subtitle}>Conversation History</Text>
+                <Text style={styles.subtitle2}>Conversation History</Text>
 
                 <View style={styles.threadsContainer}>
                     {threads.map((thread) => (
@@ -436,19 +436,40 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
     subtitle: {
-        fontSize: 18,
+        fontSize: moderateScale(18),
         color: '#666',
-        marginBottom: 30,
+        marginBottom: moderateScale(30),
+        textAlign: 'center',
+    },
+    subtitle2: {
+        fontSize: moderateScale(18),
+        color: '#666',
+        marginBottom: moderateScale(10),
         textAlign: 'center',
     },
     button: {
         flexDirection: 'row',
         alignItems: 'center',
         backgroundColor: '#FFFFFF',
-        paddingVertical: 15,
-        paddingHorizontal: 20,
+        paddingVertical: moderateScale(15),
+        paddingHorizontal: moderateScale(20),
         borderRadius: 10,
-        marginBottom: 15,
+        marginBottom: moderateScale(10),
+        width: '80%',
+        shadowColor: '#000',
+        shadowOffset: {width: 0, height: 2},
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+    },
+    button2: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFFFFF',
+        paddingVertical: moderateScale(15),
+        paddingHorizontal: moderateScale(20),
+        borderRadius: 10,
+        marginBottom: moderateScale(30),
         width: '80%',
         shadowColor: '#000',
         shadowOffset: {width: 0, height: 2},
@@ -458,14 +479,14 @@ const styles = StyleSheet.create({
     },
     buttonText: {
         color: '#333',
-        fontSize: 18,
-        marginLeft: 15,
+        fontSize: moderateScale(18),
+        marginLeft: moderateScale(15),
         fontWeight: '500',
     },
     helpText: {
         color: '#666',
-        fontSize: 14,
-        marginTop: 20,
+        fontSize: moderateScale(14),
+        marginTop: moderateScale(20),
     },
     modalContainer: {
         flex: 1,
@@ -476,39 +497,39 @@ const styles = StyleSheet.create({
     modalContent: {
         width: "80%",
         backgroundColor: "#FFF",
-        padding: 20,
+        padding: moderateScale(20),
         borderRadius: 10,
         alignItems: "center",
     },
     modalTitle: {
-        fontSize: 22,
+        fontSize: moderateScale(22),
         fontWeight: "bold",
-        marginBottom: 10,
+        marginBottom: moderateScale(10),
     },
     
     input: {
         width: "100%",
-        padding: 10,
+        padding: moderateScale(10),
         borderWidth: 1,
         borderColor: "#ccc",
         borderRadius: 5,
-        marginBottom: 10,
+        marginBottom: moderateScale(10),
         backgroundColor: "#fff",
     },
     authButton: {
         backgroundColor: "#007BFF",
-        padding: 12,
+        padding: moderateScale(12),
         borderRadius: 5,
         alignItems: "center",
         width: "100%",
     },
     authButtonText: {
         color: "#fff",
-        fontSize: 16,
+        fontSize: moderateScale(16),
         fontWeight: "bold",
     },
     switchText: {
-        marginTop: 10,
+        marginTop: moderateScale(10),
         color: "#007BFF",
     },
 
@@ -528,8 +549,8 @@ const styles = StyleSheet.create({
     threadCard: {
         backgroundColor: '#f0f0f0',
         borderRadius: 10,
-        padding: 15,
-        marginVertical: 10,
+        padding: moderateScale(15),
+        marginVertical: moderateScale(10),
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
@@ -540,9 +561,9 @@ const styles = StyleSheet.create({
      
     },
     threadTitle: {
-        fontSize: 16,
+        fontSize: moderateScale(16),
         fontWeight: 'bold',
-        marginBottom: 5,
+        marginBottom: moderateScale(5),
     },
     threadPreview: {
         color: '#666',
@@ -568,30 +589,30 @@ const styles = StyleSheet.create({
     },
     
     headerButtonText: {
-        fontSize: scale(14),
+        fontSize: moderateScale(14),
         fontWeight: '600',
         color: '#007AFF',
     },
     donationSection: {
-        marginBottom: 20,
+        marginBottom: moderateScale(20),
         textAlign: "center",
       },
       donationText: {
-        fontSize: 16,
+        fontSize: moderateScale(16),
         color: "#555",
-        marginBottom: 10,
+        marginBottom: moderateScale(10),
       },
       donationButton: {
         backgroundColor: "#007BFF",
-        paddingVertical: 12,
-        paddingHorizontal: 30,
+        paddingVertical: moderateScale(12),
+        paddingHorizontal: moderateScale(30),
         borderRadius: 8,
-        marginTop: 10,
+        marginTop: moderateScale(10),
         alignItems: "center",
       },
       donationButtonText: {
         color: "#fff",
-        fontSize: 16,
+        fontSize: moderateScale(16),
         fontWeight: "bold",
       },
       
