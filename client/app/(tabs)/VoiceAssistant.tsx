@@ -377,6 +377,7 @@ const VoiceAssistant: React.FC = () => {
     const playAudio = async (audioUri: string) => {
         try {
             let localUri = audioUri;
+            console.log(localUri)
 
             if (currentlyPlayingUriRef.current === audioUri && isPlaying) {
                 if (currentSoundRef.current) {
@@ -541,10 +542,11 @@ const VoiceAssistant: React.FC = () => {
 
             formData.append("audio", {
                 uri,
-                name: "recording.wav",
-                type: "audio/wav",
+                name: "recording.m4a",
+                type: "audio/m4a",
                 duration: durationRef.current,
             } as any); // Casting to satisfy TypeScript
+            
             if (thread_Id) {
                 formData.append("thread_id", thread_Id);
             }

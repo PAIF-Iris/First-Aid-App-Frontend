@@ -38,7 +38,16 @@ export const recordSpeech = async (
             bitRate: 128000,
           },
           ios: {
-            extension: ".wav",
+            extension: '.m4a',
+            outputFormat: Audio.IOSOutputFormat.MPEG4AAC, // ✨ this is crucial
+            audioQuality: Audio.IOSAudioQuality.MAX,
+            sampleRate: 44100,
+            numberOfChannels: 1,
+            bitRate: 128000,
+          },
+          /*
+          ios: {
+            extension: ".m4a",
             audioQuality: Audio.IOSAudioQuality.HIGH,
             sampleRate: 44100,
             numberOfChannels: 1,
@@ -47,6 +56,7 @@ export const recordSpeech = async (
             linearPCMIsBigEndian: false,
             linearPCMIsFloat: false,
           },
+          */
           web: {
             mimeType:
               Platform.OS === "web" &&
