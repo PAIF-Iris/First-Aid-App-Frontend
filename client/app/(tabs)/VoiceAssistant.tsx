@@ -40,7 +40,7 @@ export const refreshAccessToken = async () => {
     }
 
     const refreshToken = await AsyncStorage.getItem("refreshToken");
-    const response = await fetch("http://172.105.105.81/api/token/refresh/", {
+    const response = await fetch("https://172-105-105-81.ip.linodeusercontent.com/api/token/refresh/", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ refresh: refreshToken }),
@@ -175,7 +175,7 @@ const VoiceAssistant: React.FC = () => {
                 return;
             }
             const accessToken = await AsyncStorage.getItem("accessToken");
-            const response = await fetch(`http://172.105.105.81/api/get_thread_messages/`, {
+            const response = await fetch(`https://172-105-105-81.ip.linodeusercontent.com/api/get_thread_messages/`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -221,7 +221,7 @@ const VoiceAssistant: React.FC = () => {
             }
 
             const accessToken = await AsyncStorage.getItem("accessToken");
-            const response = await fetch("http://172.105.105.81/api/start_new_conversation/", {
+            const response = await fetch("https://172-105-105-81.ip.linodeusercontent.com/api/start_new_conversation/", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -272,7 +272,7 @@ const VoiceAssistant: React.FC = () => {
             const sendMessageRequest = async (retry: boolean = true) => {
                 let accessToken = await AsyncStorage.getItem("accessToken");
         
-                const response = await fetch("http://172.105.105.81/api/chat/", {
+                const response = await fetch("https://172-105-105-81.ip.linodeusercontent.com/api/chat/", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
@@ -377,7 +377,6 @@ const VoiceAssistant: React.FC = () => {
     const playAudio = async (audioUri: string) => {
         try {
             let localUri = audioUri;
-            console.log(localUri)
 
             if (currentlyPlayingUriRef.current === audioUri && isPlaying) {
                 if (currentSoundRef.current) {
@@ -537,7 +536,7 @@ const VoiceAssistant: React.FC = () => {
             setMessages((prevMessages) => [...prevMessages, loadingMessage]);
 
             const accessToken = await AsyncStorage.getItem("accessToken");
-            const uploadUrl = "http://172.105.105.81/api/chat/";
+            const uploadUrl = "https://172-105-105-81.ip.linodeusercontent.com/api/chat/";
             const formData = new FormData();
 
             formData.append("audio", {
@@ -557,7 +556,7 @@ const VoiceAssistant: React.FC = () => {
             const sendAudioRequest = async (retry: boolean = true) => {
                 let accessToken = await AsyncStorage.getItem("accessToken");
     
-                const response = await fetch("http://172.105.105.81/api/chat/", {
+                const response = await fetch("https://172-105-105-81.ip.linodeusercontent.com/api/chat/", {
                     method: "POST",
                     headers: {
                         "Authorization": `Bearer ${accessToken}`,
