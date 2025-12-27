@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "75f3d900-1146-4090-ad51-c1f55431e5c6"
+      }
+    },
+    "android": {
+      "package": "com.paif_iris.firstaid"
+    }
+  }
+}

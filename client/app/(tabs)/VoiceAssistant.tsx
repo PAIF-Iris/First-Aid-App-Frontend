@@ -120,16 +120,7 @@ const VoiceAssistant: React.FC = () => {
         loadThread();
     }, []);
 
- /*   useEffect(() => {
-        return () => {
-            Promise.all(
-                downloadedFiles.map((file) => FileSystem.deleteAsync(file))
-            )
-            .then(() => console.log("All files deleted"))
-            .catch((error) => console.error("Error deleting files:", error));
-        };
-    }, []);
-*/
+
     
     //delete all downloaded files
     useEffect(() => {
